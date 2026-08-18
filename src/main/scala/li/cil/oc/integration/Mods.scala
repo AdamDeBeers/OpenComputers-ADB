@@ -28,6 +28,7 @@ object Mods {
   val Mekanism = new SimpleMod(IDs.Mekanism)
   val CreateAddition = new SimpleMod(IDs.CreateAddition)
   val TFMG = new SimpleMod(IDs.TFMG)
+  val DashPanels = new SimpleMod(IDs.DashPanels)
   val Minecraft = new SimpleMod(IDs.Minecraft)
   val OpenComputers = new SimpleMod(IDs.OpenComputers)
   val EnderStorage = new SimpleMod(IDs.EnderStorage)
@@ -44,6 +45,7 @@ object Mods {
     integration.appeng.ModAppliedEnergistics2.INSTANCE,
     integration.createaddition.ModCreateAddition.INSTANCE,
     integration.tfmg.ModTFMG.INSTANCE,
+    integration.dashpanels.ModDashPanels.INSTANCE,
     integration.enderstorage.ModEnderStorage,
     integration.projectred.ModProjectRed,
 
@@ -107,6 +109,7 @@ object Mods {
     final val Mekanism = "mekanism"
     final val CreateAddition = "createaddition"
     final val TFMG = "tfmg"
+    final val DashPanels = "dashpanels"
     final val Minecraft = "minecraft"
     final val OpenComputers = "opencomputers"
     final val EnderStorage = "enderstorage"

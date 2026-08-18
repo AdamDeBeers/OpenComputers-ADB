@@ -266,6 +266,10 @@ dependencies {
     compileOnly("maven.modrinth:create-tfmg:${tfmg_version}")
     runtimeOnly("maven.modrinth:create-tfmg:${tfmg_version}")
 
+    // DashPanels
+    compileOnly("maven.modrinth:dashpanels:${dashpanels_version}")
+    runtimeOnly("maven.modrinth:dashpanels:${dashpanels_version}")
+
     // JEI
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
     devRuntimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
