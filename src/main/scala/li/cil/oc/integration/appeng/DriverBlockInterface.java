@@ -66,6 +66,78 @@ public final class DriverBlockInterface extends DriverSidedBlockEntity {
         public Object[] setInterfaceConfiguration(final Context context, final Arguments args) {
             return setConfig(blockEntity.getInterfaceLogic().getConfig(), context, args, 0, 1, 2, 3);
         }
+
+        @Override
+        @Callback(doc = "function():table -- Get a list of tables representing the available CPUs in the network.")
+        public Object[] getCpus(final Context context, final Arguments args) {
+            return NetworkControl.super.getCpus(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function([filter:table]):table -- Get a list of known item recipes. These can be used to issue crafting requests.")
+        public Object[] getCraftables(final Context context, final Arguments args) {
+            return NetworkControl.super.getCraftables(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function([filter:table]):table -- Get a list of the stored items in the network.")
+        public Object[] getItemsInNetwork(final Context context, final Arguments args) {
+            return NetworkControl.super.getItemsInNetwork(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function([filter:table, dbAddress:string, startSlot:number, count:number]):boolean -- Store matching items in the network in a database.")
+        public Object[] store(final Context context, final Arguments args) {
+            return NetworkControl.super.store(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function([filter:table]):table -- Get a list of the stored fluids in the network.")
+        public Object[] getFluidsInNetwork(final Context context, final Arguments args) {
+            return NetworkControl.super.getFluidsInNetwork(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function():number -- Get the average power injection into the network.")
+        public Object[] getAvgPowerInjection(final Context context, final Arguments args) {
+            return NetworkControl.super.getAvgPowerInjection(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function():number -- Get the average power usage of the network.")
+        public Object[] getAvgPowerUsage(final Context context, final Arguments args) {
+            return NetworkControl.super.getAvgPowerUsage(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function():number -- Get the idle power usage of the network.")
+        public Object[] getIdlePowerUsage(final Context context, final Arguments args) {
+            return NetworkControl.super.getIdlePowerUsage(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function():number -- Get the maximum stored power in the network.")
+        public Object[] getMaxStoredPower(final Context context, final Arguments args) {
+            return NetworkControl.super.getMaxStoredPower(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function():number -- Get the stored power in the network.")
+        public Object[] getStoredPower(final Context context, final Arguments args) {
+            return NetworkControl.super.getStoredPower(context, args);
+        }
+
+        @Override
+        @Callback(doc = "function():boolean -- True if the AE network is considered online.")
+        public Object[] isNetworkPowered(final Context context, final Arguments args) {
+            return NetworkControl.super.isNetworkPowered(context, args);
+        }
+
+        @Override
+        @Callback(direct = false, doc = "function():number -- Returns the energy demand on the AE network.")
+        public Object[] getEnergyDemand(final Context context, final Arguments args) {
+            return NetworkControl.super.getEnergyDemand(context, args);
+        }
     }
 
     public static final class Provider implements EnvironmentProvider {
