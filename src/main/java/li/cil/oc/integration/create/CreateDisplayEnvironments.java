@@ -57,6 +57,33 @@ public final class CreateDisplayEnvironments {
             return result(stats.maxRows(), stats.maxColumns());
         }
 
+        // Line-index API mirroring Create: Crafts & Additions' Digital
+        // Adapter Display Link feature, layered on top of the cursor/
+        // row-column model above rather than replacing it.
+
+        @Callback(direct = true)
+        public Object[] getLine(final Context context, final Arguments args) {
+            return result(cursorY.get() + 1);
+        }
+
+        @Callback(direct = true)
+        public Object[] setLine(final Context context, final Arguments args) {
+            final int line = args.checkInteger(0);
+            if (line < 1)
+                throw new IllegalArgumentException("line must be larger than 0");
+            cursorY.set(line - 1);
+            cursorX.set(0);
+            return result();
+        }
+
+        @Callback
+        public Object[] getMaxLines(final Context context, final Arguments args) {
+            blockEntity.updateGatheredData();
+            final DisplayTargetStats stats = blockEntity.activeTarget.provideStats(
+                    new DisplayLinkContext(blockEntity.getLevel(), blockEntity));
+            return result(stats.maxRows());
+        }
+
         @Callback(direct = true)
         public Object[] isColor(final Context context, final Arguments args) {
             return result(false);
