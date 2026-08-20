@@ -19,5 +19,7 @@ public final class ModCreateAddition implements ModProxy {
     public void initialize() {
         Driver.add(DriverAccumulator.Provider.INSTANCE);
         Driver.add(DriverAccumulator.INSTANCE);
+        Driver.add(DriverElectricMotor.Provider.INSTANCE);
+        Driver.add(DriverElectricMotor.INSTANCE);
     }
 }
