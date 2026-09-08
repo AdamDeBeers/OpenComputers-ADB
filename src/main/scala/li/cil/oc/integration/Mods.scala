@@ -29,6 +29,7 @@ object Mods {
   val CreateAddition = new SimpleMod(IDs.CreateAddition)
   val TFMG = new SimpleMod(IDs.TFMG)
   val DashPanels = new SimpleMod(IDs.DashPanels)
+  val Tesseract = new SimpleMod(IDs.Tesseract)
   val Minecraft = new SimpleMod(IDs.Minecraft)
   val OpenComputers = new SimpleMod(IDs.OpenComputers)
   val EnderStorage = new SimpleMod(IDs.EnderStorage)
@@ -46,6 +47,7 @@ object Mods {
     integration.createaddition.ModCreateAddition.INSTANCE,
     integration.tfmg.ModTFMG.INSTANCE,
     integration.dashpanels.ModDashPanels.INSTANCE,
+    integration.tesseract.ModTesseract.INSTANCE,
     integration.enderstorage.ModEnderStorage,
     integration.projectred.ModProjectRed,
 
@@ -110,6 +112,7 @@ object Mods {
     final val CreateAddition = "createaddition"
     final val TFMG = "tfmg"
     final val DashPanels = "dashpanels"
+    final val Tesseract = "tesseract"
     final val Minecraft = "minecraft"
     final val OpenComputers = "opencomputers"
     final val EnderStorage = "enderstorage"

@@ -270,6 +270,14 @@ dependencies {
     compileOnly("maven.modrinth:dashpanels:${dashpanels_version}")
     runtimeOnly("maven.modrinth:dashpanels:${dashpanels_version}")
 
+    // Tesseract (not published under a resolvable maven.modrinth/curse.maven
+    // coordinate we could confirm, so its jar and its supermartijn642corelib
+    // dependency are vendored into libs/ and resolved via the flatDir repo instead)
+    compileOnly(":tesseract-${tesseract_version}")
+    runtimeOnly(":tesseract-${tesseract_version}")
+    compileOnly(":supermartijn642corelib-${supermartijn642corelib_version}")
+    runtimeOnly(":supermartijn642corelib-${supermartijn642corelib_version}")
+
     // JEI
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
     devRuntimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
