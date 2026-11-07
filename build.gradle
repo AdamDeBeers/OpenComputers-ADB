@@ -262,9 +262,9 @@ dependencies {
     compileOnly("maven.modrinth:createaddition:${createaddition_version}")
     runtimeOnly("maven.modrinth:createaddition:${createaddition_version}")
 
-    // The Factory Must Grow
-    compileOnly("maven.modrinth:create-tfmg:${tfmg_version}")
-    runtimeOnly("maven.modrinth:create-tfmg:${tfmg_version}")
+    // The Factory Must Grow (Community Edition)
+    compileOnly("maven.modrinth:tfmg-community-edition:${tfmg_version}")
+    runtimeOnly("maven.modrinth:tfmg-community-edition:${tfmg_version}")
 
     // DashPanels
     compileOnly("maven.modrinth:dashpanels:${dashpanels_version}")

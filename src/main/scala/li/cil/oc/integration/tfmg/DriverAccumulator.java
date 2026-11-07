@@ -20,11 +20,17 @@ import net.minecraft.world.level.Level;
 // is placed from an item). Accumulators form a multiblock stack along their
 // facing direction; only the "controller" part (the one nothing continues
 // behind, see isController()) owns the real energy storage, length and
-// derived capacity/voltage/rate figures - the other parts mirror it via a
-// shared energy capability but report zero for their own local fields, so
-// callers should target the controller part for anything beyond isCharging/
-// isDischarging/getNetworkVoltage, which reflect this specific part's view
-// of the network regardless of its role in the stack.
+// derived capacity - the other parts mirror it via a shared energy
+// capability but report zero for their own local fields, so
+// callers should target the controller part for anything beyond
+// getNetworkVoltage, which reflects this specific part's view of the network
+// regardless of its role in the stack.
+//
+// Since TFMG 1.3 the accumulator is a plain FE storage: charging and
+// discharging are driven by the FE transfer of attached cable connectors and
+// hubs, and the block entity no longer exposes a charging rate, output voltage
+// or charge direction. Those are therefore derived here from the change in
+// stored energy, sampled over a fixed window of game ticks.
 public final class DriverAccumulator extends DriverSidedBlockEntity {
     public static final DriverAccumulator INSTANCE = new DriverAccumulator();
 
@@ -56,6 +62,43 @@ public final class DriverAccumulator extends DriverSidedBlockEntity {
             return 0;
         }
 
+        // FE transfers into and out of the accumulator do not necessarily
+        // happen every tick, so the delta is averaged over this many ticks.
+        private static final long SAMPLE_WINDOW_TICKS = 20L;
+
+        private long windowStartTick = Long.MIN_VALUE;
+        private int windowStartEnergy;
+        // Average energy change per tick over the last completed window, in FE/t.
+        private double energyDelta;
+
+        @Override
+        public boolean canUpdate() {
+            return true;
+        }
+
+        @Override
+        public void update() {
+            final Level level = blockEntity.getLevel();
+            if (level == null || blockEntity.isRemoved()) {
+                return;
+            }
+
+            final long now = level.getGameTime();
+            final int energy = blockEntity.energy.getEnergyStored();
+            if (windowStartTick == Long.MIN_VALUE || now < windowStartTick) {
+                windowStartTick = now;
+                windowStartEnergy = energy;
+                return;
+            }
+
+            final long elapsed = now - windowStartTick;
+            if (elapsed >= SAMPLE_WINDOW_TICKS) {
+                energyDelta = (double) (energy - windowStartEnergy) / elapsed;
+                windowStartTick = now;
+                windowStartEnergy = energy;
+            }
+        }
+
         @Callback(doc = "function():boolean -- Whether this block is the controller of the accumulator multiblock stack. Stored energy, capacity and rate figures are only meaningful on the controller.")
         public Object[] isController(final Context context, final Arguments args) {
             return new Object[]{blockEntity.isController()};
@@ -71,29 +114,24 @@ public final class DriverAccumulator extends DriverSidedBlockEntity {
             return new Object[]{blockEntity.getMaxCapacity()};
         }
 
-        @Callback(doc = "function():number -- Get the current charging rate, in FE/t. 0 if not currently charging. Only meaningful on the controller.")
+        @Callback(doc = "function():number -- Get the average change in stored energy, in FE/t, over the last second. Positive while charging, negative while discharging. Only meaningful on the controller.")
+        public Object[] getEnergyDelta(final Context context, final Arguments args) {
+            return new Object[]{energyDelta};
+        }
+
+        @Callback(doc = "function():number -- Get the current charging rate, in FE/t, averaged over the last second. 0 if not currently charging. Only meaningful on the controller.")
         public Object[] getChargingRate(final Context context, final Arguments args) {
-            return new Object[]{blockEntity.getChargingRate()};
+            return new Object[]{Math.max(0.0, energyDelta)};
         }
 
-        @Callback(doc = "function():number -- Get the maximum possible charging rate, in FE/t.")
-        public Object[] getMaxChargingRate(final Context context, final Arguments args) {
-            return new Object[]{blockEntity.getMaxChargingRate()};
-        }
-
-        @Callback(doc = "function():boolean -- Whether the accumulator is currently charging.")
+        @Callback(doc = "function():boolean -- Whether the stored energy increased over the last second. Only meaningful on the controller.")
         public Object[] isCharging(final Context context, final Arguments args) {
-            return new Object[]{blockEntity.getChargingRate() > 0};
+            return new Object[]{energyDelta > 0};
         }
 
-        @Callback(doc = "function():boolean -- Whether the accumulator is currently discharging (powering the network).")
+        @Callback(doc = "function():boolean -- Whether the stored energy decreased over the last second. Only meaningful on the controller.")
         public Object[] isDischarging(final Context context, final Arguments args) {
-            return new Object[]{blockEntity.canPower()};
-        }
-
-        @Callback(doc = "function():number -- Get the voltage this accumulator stack outputs while discharging. Only meaningful on the controller.")
-        public Object[] getOutputVoltage(final Context context, final Arguments args) {
-            return new Object[]{blockEntity.getOutputVoltage()};
+            return new Object[]{energyDelta < 0};
         }
 
         @Callback(doc = "function():number -- Get the electrical network's voltage at this block.")
