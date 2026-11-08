@@ -27,6 +27,8 @@ abstract class VoltageAlteringBlockEntityPacketThrottleMixin {
    @Unique
    private static final long THROTTLE_TICKS = 2L;
 
+   // Long.MIN_VALUE marks "never synced". It must be checked explicitly: subtracting it from
+   // the game time overflows to a negative value, which would suppress every sync.
    @Unique
    private long opencomputers$lastNetworkChangeSyncTick = Long.MIN_VALUE;
 
@@ -47,7 +49,8 @@ abstract class VoltageAlteringBlockEntityPacketThrottleMixin {
       }
 
       long now = level.getGameTime();
-      if (now - this.opencomputers$lastNetworkChangeSyncTick >= THROTTLE_TICKS) {
+      long last = this.opencomputers$lastNetworkChangeSyncTick;
+      if (last == Long.MIN_VALUE || now < last || now - last >= THROTTLE_TICKS) {
          this.opencomputers$lastNetworkChangeSyncTick = now;
          self.sendStuff();
       }
