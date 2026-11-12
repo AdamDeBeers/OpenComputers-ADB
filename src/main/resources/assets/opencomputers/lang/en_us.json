@@ -308,7 +308,7 @@
   "oc:tooltip.datacard0": "Provides a couple of advanced algorithms such as hashing and deflate/inflate.",
   "oc:tooltip.datacard1": "Provides a couple of advanced algorithms such as hashing, AES encryption and deflate/inflate.",
   "oc:tooltip.datacard2": "Provides a couple of advanced algorithms such as hashing, AES encryption, elliptic curve cryptography and deflate/inflate.",
-  "oc:tooltip.miningcard0": "Dedicated SHA-256 hashing hardware for ForgeCoin. Slow, but cheap to run. FRG has no real-world value.",
+  "oc:tooltip.miningcard0": "Entry-level SHA-256 hashing hardware for ForgeCoin. Slow, but draws the least power. FRG has no real-world value.",
   "oc:tooltip.miningcard1": "Dedicated SHA-256 hashing hardware for ForgeCoin. FRG has no real-world value.",
   "oc:tooltip.miningcard2": "High-end SHA-256 hashing hardware for ForgeCoin. Needs serious power. FRG has no real-world value.",
   "oc:tooltip.debugcard": "Creative mode item, allows manipulating the world to make testing easier. Use at your own peril.",
