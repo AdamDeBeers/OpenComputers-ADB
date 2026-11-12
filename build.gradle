@@ -277,6 +277,8 @@ dependencies {
     runtimeOnly(":tesseract-${tesseract_version}")
     compileOnly(":supermartijn642corelib-${supermartijn642corelib_version}")
     runtimeOnly(":supermartijn642corelib-${supermartijn642corelib_version}")
+    // Tesseract also needs SuperMartijn642's Config Lib at runtime (published on Modrinth)
+    runtimeOnly("maven.modrinth:supermartijn642s-config-lib:${supermartijn642configlib_version}")
 
     // JEI
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
