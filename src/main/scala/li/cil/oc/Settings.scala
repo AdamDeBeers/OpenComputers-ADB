@@ -381,6 +381,31 @@ class Settings(val config: Config) {
   val dataCardSoftLimit = config.getInt("misc.dataCardSoftLimit") max 0
   val dataCardHardLimit = config.getInt("misc.dataCardHardLimit") max 0
   val dataCardTimeout = config.getDouble("misc.dataCardTimeout") max 0
+  // ADB: ForgeCoin mining card (index = tier, 0-based)
+  val miningCardHashesPerSecond = config.getIntList("misc.miningCardHashesPerSecond").asScala.toArray match {
+    case Array(tier1, tier2, tier3) =>
+      Array((tier1: Int) max 0, (tier2: Int) max 0, (tier3: Int) max 0)
+    case _ =>
+      OpenComputers.log.warn("Bad number of mining card hash rates, ignoring.")
+      Array(30, 75, 150)
+  }
+  val miningCardMaxPerCall = config.getIntList("misc.miningCardMaxPerCall").asScala.toArray match {
+    case Array(tier1, tier2, tier3) =>
+      Array((tier1: Int) max 1, (tier2: Int) max 1, (tier3: Int) max 1)
+    case _ =>
+      OpenComputers.log.warn("Bad number of mining card per-call limits, ignoring.")
+      Array(8, 8, 8)
+  }
+  val miningCardEnergyPerHashFE = config.getDoubleList("power.cost.miningCardEnergyPerHashFE").asScala.toArray match {
+    case Array(tier1, tier2, tier3) =>
+      Array((tier1: Double) max 0, (tier2: Double) max 0, (tier3: Double) max 0)
+    case _ =>
+      OpenComputers.log.warn("Bad number of mining card energy costs, ignoring.")
+      Array(83.3, 66.7, 50.0)
+  }
+  // Converted once from FE to internal energy so a changed power.value.ForgeEnergy stays consistent.
+  val miningCardEnergyPerHash = miningCardEnergyPerHashFE.map(_ * ratioForgeEnergy)
+  val miningCardGlobalHashesPerSecond = config.getInt("misc.miningCardGlobalHashesPerSecond") max 0
   val serverRackSwitchTier = (config.getInt("misc.serverRackSwitchTier") - 1) max Tier.None min Tier.Four
   val redstoneDelay = config.getDouble("misc.redstoneDelay") max 0
   val tradingRange = config.getDouble("misc.tradingRange") max 0

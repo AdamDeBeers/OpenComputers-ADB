@@ -126,6 +126,7 @@ object EventHandler {
     })
 
     serverTicks += 1
+    li.cil.oc.server.component.MiningBudget.onServerTick()
     while (pendingServerTimed.nonEmpty && pendingServerTimed.head._1 < serverTicks) {
       val (_, callback) = pendingServerTimed.dequeue()
       try callback() catch {

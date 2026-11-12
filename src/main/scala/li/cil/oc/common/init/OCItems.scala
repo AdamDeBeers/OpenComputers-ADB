@@ -453,6 +453,11 @@ object OCItems extends ItemAPI {
   val DataCardTier2: DeferredItem[item.DataCard] = registerItem(new item.DataCard(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.DataCardTier2)
   val DataCardTier3: DeferredItem[item.DataCard] = registerItem(new item.DataCard(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.DataCardTier3)
 
+  // ADB: ForgeCoin mining cards
+  val MiningCardTier1: DeferredItem[item.MiningCard] = registerItem(new item.MiningCard(defaultProps, Tier.One), Constants.ItemName.MiningCardTier1)
+  val MiningCardTier2: DeferredItem[item.MiningCard] = registerItem(new item.MiningCard(defaultProps.rarity(Rarity.UNCOMMON), Tier.Two), Constants.ItemName.MiningCardTier2)
+  val MiningCardTier3: DeferredItem[item.MiningCard] = registerItem(new item.MiningCard(defaultProps.rarity(Rarity.RARE), Tier.Three), Constants.ItemName.MiningCardTier3)
+
   // 1.9
   val AudioCardTier1: DeferredItem[item.AudioCard] = registerItem(new item.AudioCard(defaultProps), Constants.ItemName.AudioCardTier1)
 
