@@ -26,6 +26,7 @@ Keep in mind that some of these may not be available, depending on the recipe se
 * [Quad T2 Graphics Card](quadgraphicscard.md)
 * [Internet Card](internetcard.md)
 * [Linked Card](linkedcard.md)
+* [Mining Card](miningcard1.md)
 * [Network Card](lancard.md)
 * [Redstone Card](redstonecard1.md)
 * [Wireless Network Card](wlancard1.md)

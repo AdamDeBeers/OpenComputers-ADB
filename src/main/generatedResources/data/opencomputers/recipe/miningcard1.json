@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "opencomputers:chip2"
+    },
+    "D": {
+      "item": "opencomputers:datacard1"
+    },
+    "g": {
+      "tag": "c:nuggets/gold"
+    }
+  },
+  "pattern": [
+    "gCg",
+    " D "
+  ],
+  "result": {
+    "count": 1,
+    "id": "opencomputers:miningcard1"
+  }
+}

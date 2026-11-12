@@ -790,6 +790,36 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.Card()), has(OCItems.Card()))
             .save(output);
 
+        // ADB: ForgeCoin mining cards
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCItems.MiningCardTier1())
+            .pattern("gCg")
+            .pattern(" D ")
+            .define('g', Tags.Items.NUGGETS_GOLD)
+            .define('C', OCItems.ChipTier2())
+            .define('D', OCItems.DataCardTier1())
+            .unlockedBy(getHasName(OCItems.DataCardTier1()), has(OCItems.DataCardTier1()))
+            .save(output);
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCItems.MiningCardTier2())
+            .pattern("gPg")
+            .pattern("CDC")
+            .define('g', Tags.Items.INGOTS_GOLD)
+            .define('P', OCItems.CPUTier1())
+            .define('C', OCItems.ChipTier3())
+            .define('D', OCItems.DataCardTier2())
+            .unlockedBy(getHasName(OCItems.DataCardTier2()), has(OCItems.DataCardTier2()))
+            .save(output);
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCItems.MiningCardTier3())
+            .pattern("dPd")
+            .pattern("CDC")
+            .define('d', OCItems.DiamondChip())
+            .define('P', OCItems.CPUTier3())
+            .define('C', OCItems.ChipTier3())
+            .define('D', OCItems.DataCardTier3())
+            .unlockedBy(getHasName(OCItems.DataCardTier3()), has(OCItems.DataCardTier3()))
+            .save(output);
+
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCItems.AudioCardTier1())
             .pattern("CNU")
             .pattern(" B ")

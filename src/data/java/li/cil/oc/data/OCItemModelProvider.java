@@ -113,6 +113,9 @@ public class OCItemModelProvider extends ItemModelProvider {
         basicItem(OCItems.DataCardTier1().get());
         basicItem(OCItems.DataCardTier2().get());
         basicItem(OCItems.DataCardTier3().get());
+        basicItem(OCItems.MiningCardTier1().get());
+        basicItem(OCItems.MiningCardTier2().get());
+        basicItem(OCItems.MiningCardTier3().get());
         basicItem(OCItems.AudioCardTier1().get());
 
         // Upgrade components.

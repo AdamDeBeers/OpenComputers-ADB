@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_datacard1": {
+      "conditions": {
+        "items": [
+          {
+            "items": "opencomputers:datacard1"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "opencomputers:miningcard1"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_datacard1"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "opencomputers:miningcard1"
+    ]
+  }
+}

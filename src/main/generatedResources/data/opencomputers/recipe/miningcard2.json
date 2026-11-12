@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "opencomputers:chip3"
+    },
+    "D": {
+      "item": "opencomputers:datacard2"
+    },
+    "P": {
+      "item": "opencomputers:cpu1"
+    },
+    "g": {
+      "tag": "c:ingots/gold"
+    }
+  },
+  "pattern": [
+    "gPg",
+    "CDC"
+  ],
+  "result": {
+    "count": 1,
+    "id": "opencomputers:miningcard2"
+  }
+}

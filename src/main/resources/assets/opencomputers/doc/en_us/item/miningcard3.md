@@ -1,0 +1,1 @@
+#REDIRECT miningcard1.md
