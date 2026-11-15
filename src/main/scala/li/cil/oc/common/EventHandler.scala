@@ -127,6 +127,7 @@ object EventHandler {
 
     serverTicks += 1
     li.cil.oc.server.component.MiningBudget.onServerTick()
+    li.cil.oc.server.component.MiningSecret.onServerTick(e.getServer)
     integration.SableTickBridge.tick(e.getServer)
     while (pendingServerTimed.nonEmpty && pendingServerTimed.head._1 < serverTicks) {
       val (_, callback) = pendingServerTimed.dequeue()
