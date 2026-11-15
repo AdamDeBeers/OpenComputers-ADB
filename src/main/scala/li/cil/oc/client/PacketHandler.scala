@@ -19,7 +19,7 @@ import java.io.{EOFException, InputStream}
 import li.cil.oc.util.{Audio, ClientAccessHelper}
 import li.cil.oc.util.ExtendedLevel._
 import net.minecraft.client.Minecraft
-import net.minecraft.core.Direction
+import net.minecraft.core.{BlockPos, Direction}
 import net.minecraft.core.component.DataComponentMap
 import net.minecraft.core.registries.Registries
 import net.minecraft.core.particles.ParticleOptions
@@ -35,8 +35,27 @@ import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.connection.ConnectionType
 import net.neoforged.neoforge.registries.NeoForgeRegistries
 
+import scala.collection.mutable
+
 object PacketHandler extends CommonPacketHandler {
   private val audioSessions = scala.collection.mutable.Map[Int, AudioSession]()
+
+  private final case class PendingProjectorFrame(
+    dimension: ResourceLocation,
+    blockX: Int,
+    blockY: Int,
+    blockZ: Int,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    data: Array[Int]
+  )
+
+  // Chunk watch packets can beat the client-side block-entity construction.
+  // Keep the latest frame until the projector exists instead of dropping the
+  // only full-frame snapshot sent when a chunk becomes visible.
+  private val pendingProjectorFrames = mutable.LinkedHashMap.empty[(ResourceLocation, Int, Int, Int), PendingProjectorFrame]
 
   def update(): Unit = {
     audioSessions.synchronized {
@@ -47,6 +66,48 @@ object PacketHandler extends CommonPacketHandler {
         audioSessions.remove(handle)
       }
     }
+    applyPendingProjectorFrames()
+  }
+
+  /** Stop and release every client-side OpenAL stream during a world/session transition. */
+  def stopAllAudio(): Unit = audioSessions.synchronized {
+    val sessions = audioSessions.values.toSeq
+    audioSessions.clear()
+    sessions.foreach { session =>
+      session.stop()
+      session.cleanup()
+    }
+  }
+
+  def clearPendingProjectorFrames(): Unit = pendingProjectorFrames.synchronized {
+    pendingProjectorFrames.clear()
+  }
+
+  private def findProjector(frame: PendingProjectorFrame, player: Player): Option[Projector] = {
+    world(player, frame.dimension) match {
+      case Some(level) =>
+        val pos = new BlockPos(frame.blockX, frame.blockY, frame.blockZ)
+        if (level.isLoaded(pos)) level.getBlockEntity(pos) match {
+          case projector: Projector => Some(projector)
+          case _ => None
+        }
+        else None
+      case _ => None
+    }
+  }
+
+  private def applyPendingProjectorFrames(): Unit = {
+    val player = Minecraft.getInstance.player
+    if (player == null) return
+
+    val frames = pendingProjectorFrames.synchronized(pendingProjectorFrames.toVector)
+    val applied = frames.collect {
+      case (key, frame) if findProjector(frame, player).exists { projector =>
+        projector.clientFrame(frame.x, frame.y, frame.width, frame.height, frame.data)
+        true
+      } => key
+    }
+    if (applied.nonEmpty) pendingProjectorFrames.synchronized(applied.foreach(pendingProjectorFrames.remove))
   }
 
   protected override def world(player: Player, dimension: ResourceLocation): Option[Level] = {
@@ -67,6 +128,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.AudioStop   => onAudioStop(p)
       case PacketType.AudioClose  => onAudioClose(p)
       case PacketType.AudioSetLoop => onAudioSetLoop(p)
+      case PacketType.TapeAudioStart => onTapeAudioStart(p)
       case PacketType.ChargerState => onChargerState(p)
       case PacketType.ClientLog => onClientLog(p)
       case PacketType.Clipboard => onClipboard(p)
@@ -87,6 +149,8 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.HologramScale => onHologramScale(p)
       case PacketType.HologramTranslation => onHologramPositionOffsetY(p)
       case PacketType.HologramValues => onHologramValues(p)
+      case PacketType.ProjectorFrame => onProjectorFrame(p)
+      case PacketType.ProjectorPowerChange => onProjectorPowerChange(p)
       case PacketType.LootDisksReset => onLootDisksReset(p)
       case PacketType.LootDisk => onLootDisk(p)
       case PacketType.CyclingDisk => onCyclingDisk(p)
@@ -123,6 +187,7 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.SoundEffect => onSoundEffect(p)
       case PacketType.Sound => onSound(p)
       case PacketType.SoundPattern => onSoundPattern(p)
+      case PacketType.ComputronicsTone => onComputronicsTone(p)
       case PacketType.TransposerActivity => onTransposerActivity(p)
       case PacketType.WaypointLabel => onWaypointLabel(p)
       case _ => // Invalid packet.
@@ -136,12 +201,42 @@ object PacketHandler extends CommonPacketHandler {
     val channels = p.readInt()
     val format = p.readInt()
     val loop = p.readBoolean()
-    val pos = p.readBlockPosCoords()
+    val pos = new Vec3(p.readDouble(), p.readDouble(), p.readDouble())
+
+    OpenComputers.log.info(s"Audio stream start: handle=$handle, sampleRate=$sampleRate, channels=$channels, format=$format, loop=$loop")
 
     val s = new AudioSession(handle, channel, sampleRate, channels, format, pos)
     s.loop = loop
     audioSessions.synchronized {
       audioSessions(handle) = s
+    }
+  }
+
+  def onTapeAudioStart(p: PacketParser): Unit = {
+    val handle = p.readInt()
+    val sampleRate = p.readInt()
+    val volume = p.readFloat()
+    val pos = new Vec3(p.readDouble(), p.readDouble(), p.readDouble())
+
+    OpenComputers.log.info(s"Tape audio stream start: handle=$handle, sampleRate=$sampleRate, volume=$volume")
+
+    val session = new AudioSession(handle, 0, sampleRate, 1, org.lwjgl.openal.AL10.AL_FORMAT_MONO8,
+      pos, encodedDfpwm = true, streamGain = volume)
+    audioSessions.synchronized {
+      audioSessions.remove(handle).foreach(_.cleanup())
+      audioSessions(handle) = session
+    }
+  }
+
+  def onComputronicsTone(p: PacketParser): Unit = {
+    {
+      val x = p.readDouble(); val y = p.readDouble(); val z = p.readDouble()
+      val mode = p.readUnsignedByte(); val frequency = p.readShort()
+      val duration = p.readUnsignedShort(); val delay = p.readUnsignedShort(); val volume = p.readFloat()
+      val fmFrequency = p.readUnsignedShort(); val fmIntensity = p.readFloat(); val amFrequency = p.readUnsignedShort()
+      val attack = p.readUnsignedShort(); val decay = p.readUnsignedShort(); val sustain = p.readFloat(); val release = p.readUnsignedShort()
+      Audio.playWave(x.toFloat, y.toFloat, z.toFloat, mode, frequency, duration, delay, volume,
+        fmFrequency, fmIntensity, amFrequency, attack, decay, sustain, release)
     }
   }
 
@@ -177,7 +272,10 @@ object PacketHandler extends CommonPacketHandler {
   def onAudioStop(p: PacketParser): Unit = {
     val handle = p.readInt()
     audioSessions.synchronized {
-      audioSessions.get(handle).foreach(_.stop())
+      audioSessions.remove(handle).foreach { session =>
+        session.stop()
+        session.cleanup()
+      }
     }
   }
 
@@ -390,6 +488,39 @@ object PacketHandler extends CommonPacketHandler {
       case _ => // Invalid packet.
     }
 
+  def onProjectorFrame(p: PacketParser): Unit = {
+    val dimension = ResourceLocation.tryParse(p.readUTF())
+    val blockX = p.readInt()
+    val blockY = p.readInt()
+    val blockZ = p.readInt()
+    val x = p.readInt()
+    val y = p.readInt()
+    val width = p.readInt()
+    val height = p.readInt()
+    val valid = dimension != null && x >= 0 && y >= 0 && width >= 0 && height >= 0 &&
+      x + width <= Projector.Width && y + height <= Projector.Height &&
+      width.toLong * height <= Projector.Width.toLong * Projector.Height
+    if (!valid) return
+
+    val data = Array.fill(width * height)(0)
+    for (i <- data.indices) data(i) = p.readInt()
+    val frame = PendingProjectorFrame(dimension, blockX, blockY, blockZ, x, y, width, height, data)
+    findProjector(frame, p.player) match {
+      case Some(projector) => projector.clientFrame(x, y, width, height, data)
+      case _ => pendingProjectorFrames.synchronized {
+        pendingProjectorFrames.update((dimension, blockX, blockY, blockZ), frame)
+      }
+    }
+  }
+
+  def onProjectorPowerChange(p: PacketParser): Unit =
+    p.readBlockEntity[Projector]() match {
+      case Some(t) =>
+        t.isOn = p.readBoolean()
+        t.hasPower = p.readBoolean()
+      case _ => // Invalid packet.
+    }
+
   def onHologramPositionOffsetY(p: PacketParser): Unit =
     p.readBlockEntity[Hologram]() match {
       case Some(t) =>
@@ -431,7 +562,7 @@ object PacketHandler extends CommonPacketHandler {
   }
 
   def onLootDisksReset(p: PacketParser): Unit = {
-    Loot.disksForClient.clear()
+    Loot.resetDisksForClient()
     Loot.disksForCyclingClient.clear()
   }
 

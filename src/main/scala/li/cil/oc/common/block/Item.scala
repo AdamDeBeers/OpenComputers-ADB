@@ -3,7 +3,7 @@ package li.cil.oc.common.block
 import li.cil.oc.{Constants, Settings, api}
 import li.cil.oc.common.{block, blockentity}
 import li.cil.oc.common.item.data.{MicrocontrollerData, PrintData, RobotData}
-import li.cil.oc.util.Rarity
+import li.cil.oc.util.{Rarity, RotationHelper, SableCompat}
 import net.minecraft.core.Direction
 import net.minecraft.core.component.DataComponents
 import net.minecraft.network.chat.Component
@@ -14,6 +14,7 @@ import net.minecraft.world.item.context.BlockPlaceContext
 import net.minecraft.world.level.block.Block
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.Vec3
 
 class Item(value: Block, props: Properties) extends BlockItem(value, props) {
   override def appendHoverText(stack: ItemStack, ctx: TooltipContext, tooltip: java.util.List[Component], flag: TooltipFlag): Unit = {
@@ -57,10 +58,12 @@ class Item(value: Block, props: Properties) extends BlockItem(value, props) {
       ctx.getLevel.getBlockEntity(ctxToUse.getClickedPos) match {
         case keyboard: blockentity.Keyboard => // Ignore.
         case rotatable: blockentity.traits.Rotatable =>
-          rotatable.setFromEntityPitchAndYaw(ctxToUse.getPlayer)
-          if (!rotatable.validFacings.contains(rotatable.pitch)) {
-            rotatable.pitch = rotatable.validFacings.headOption.getOrElse(Direction.NORTH)
-          }
+          val localClickPos = Vec3.atCenterOf(ctxToUse.getClickedPos)
+          val forward = Vec3.directionFromRotation(ctxToUse.getPlayer.getXRot, ctxToUse.getPlayer.getYRot).reverse()
+          val side = Vec3.directionFromRotation(0, ctxToUse.getPlayer.getYRot + 90).reverse()
+          val localYaw = SableCompat.localHeading(ctxToUse.getLevel, localClickPos, forward, side)
+          val localPitch = SableCompat.localPitch(ctxToUse.getLevel, localClickPos, forward)
+          rotatable.setFromPitchAndYaw(localPitch.toFloat, localYaw.toFloat)
           if (!rotatable.isInstanceOf[blockentity.RobotProxy]) {
             rotatable.invertRotation()
           }

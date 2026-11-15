@@ -1,9 +1,10 @@
 package li.cil.oc.integration.jei
 
-import li.cil.oc.{Constants, OpenComputers}
-import li.cil.oc.api.Items
+import li.cil.oc.OpenComputers
 import li.cil.oc.client.gui.Relay
+import li.cil.oc.common.{ContentVisibility, Loot}
 import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.integration.util.ItemSearch
 import li.cil.oc.util.StackOption
 import mezz.jei.api.{IModPlugin, JeiPlugin}
@@ -13,20 +14,27 @@ import mezz.jei.api.registration.{IAdvancedRegistration, IGuiHandlerRegistration
 import mezz.jei.api.runtime.IJeiRuntime
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.resources.ResourceLocation
-import net.minecraft.world.item.{Item, ItemStack}
+import net.minecraft.world.item.ItemStack
+import net.neoforged.fml.ModList
+
+import scala.jdk.CollectionConverters._
 
 @JeiPlugin
 class ModPluginOpenComputers extends IModPlugin {
   override def getPluginUid: ResourceLocation = ResourceLocation.fromNamespaceAndPath(OpenComputers.ID, "jei_plugin")
 
   override def registerCategories(registry: IRecipeCategoryRegistration): Unit = {
-    registry.addRecipeCategories(ManualUsageHandler.ManualUsageRecipeCategory)
-    registry.addRecipeCategories(CallbackDocHandler.CallbackDocRecipeCategory)
+    if (!ModList.get().isLoaded("emi")) {
+      registry.addRecipeCategories(ManualUsageHandler.ManualUsageRecipeCategory)
+      registry.addRecipeCategories(CallbackDocHandler.CallbackDocRecipeCategory)
+    }
   }
 
   override def registerRecipes(registration: IRecipeRegistration): Unit = {
-    registration.addRecipes(ManualUsageHandler.RecipeType, ManualUsageHandler.getRecipes(registration))
-    registration.addRecipes(CallbackDocHandler.RecipeType, CallbackDocHandler.getRecipes(registration))
+    if (!ModList.get().isLoaded("emi")) {
+      registration.addRecipes(ManualUsageHandler.RecipeType, ManualUsageHandler.getRecipes(registration))
+      registration.addRecipes(CallbackDocHandler.RecipeType, CallbackDocHandler.getRecipes(registration))
+    }
   }
 
   override def registerGuiHandlers(registration: IGuiHandlerRegistration): Unit =
@@ -47,7 +55,15 @@ class ModPluginOpenComputers extends IModPlugin {
     stackUnderMouse = (_, _, _) => StackOption(jeiRuntime.getIngredientListOverlay.getIngredientUnderMouse(VanillaTypes.ITEM_STACK))
     ModJEI.runtime = Option(jeiRuntime)
     ModJEI.ingredientRegistry = Option(jeiRuntime.getIngredientManager)
-    ModJEI.addItemAtRuntime(Items.get(Constants.ItemName.LuaBios).createItemStack(1))
+    // TMRV cannot apply JEI runtime registry changes. EMI handles configured
+    // visibility natively, and native EMI recipes replace these two JEI types.
+    if (!ModList.get().isLoaded("toomanyrecipeviewers")) {
+      val hiddenStacks = ContentVisibility.hiddenItems.asScala.map(new ItemStack(_)).toSeq.asJava
+      if (!hiddenStacks.isEmpty) {
+        jeiRuntime.getIngredientManager.removeIngredientsAtRuntime(VanillaTypes.ITEM_STACK, hiddenStacks)
+      }
+      Option(Loot.defaultEEPROM).filter(!_.isEmpty).foreach(ModJEI.addItemAtRuntime)
+    }
   }
 
   override def onRuntimeUnavailable(): Unit = {
@@ -56,35 +72,29 @@ class ModPluginOpenComputers extends IModPlugin {
   }
 
   override def registerItemSubtypes(subtypeRegistry: ISubtypeRegistration): Unit = {
-    def itemFor(name: String): Item = {
-      val info = Items.get(name)
-      Option(info.item).getOrElse(if (info.block != null) info.block.asItem() else null)
-    }
-
     val componentInterpreter = new ISubtypeInterpreter[ItemStack] {
       override def getSubtypeData(stack: ItemStack, ctx: UidContext): Object = stack.getComponentsPatch
+
       override def getLegacyStringSubtypeInfo(stack: ItemStack, ctx: UidContext): String = ""
     }
 
     Seq(
-      Constants.BlockName.Microcontroller,
-      Constants.BlockName.Robot,
-      Constants.ItemName.EEPROM,
-      Constants.ItemName.Drone,
-      Constants.ItemName.Tablet
-    ).map(itemFor).filter(_ != null).distinct.foreach(subtypeRegistry.registerSubtypeInterpreter(_, componentInterpreter))
+      OCBlocks.Microcontroller.asItem(),
+      OCBlocks.Robot.asItem(),
+      OCItems.EEPROM.asItem(),
+      OCItems.Drone.asItem(),
+      OCItems.Tablet.asItem()
+    ).foreach(subtypeRegistry.registerSubtypeInterpreter(_, componentInterpreter))
 
-    val floppy = itemFor(Constants.ItemName.Floppy)
-    if (floppy != null) {
-      subtypeRegistry.registerSubtypeInterpreter(floppy, new ISubtypeInterpreter[ItemStack] {
-        override def getSubtypeData(stack: ItemStack, ctx: UidContext): Object = {
-          if (stack.has(OCComponents.LOOT_DISK.get())) stack.get(OCComponents.LOOT_DISK.get()) else null
-        }
-        override def getLegacyStringSubtypeInfo(stack: ItemStack, ctx: UidContext): String = {
-          val data = getSubtypeData(stack, ctx)
-          if (data == null) "" else data.toString
-        }
-      })
-    }
+    subtypeRegistry.registerSubtypeInterpreter(OCItems.Floppy.asItem(), new ISubtypeInterpreter[ItemStack] {
+      override def getSubtypeData(stack: ItemStack, ctx: UidContext): Object = {
+        stack.get(OCComponents.LOOT_DISK.get())
+      }
+
+      override def getLegacyStringSubtypeInfo(stack: ItemStack, ctx: UidContext): String = {
+        val data = getSubtypeData(stack, ctx)
+        if (data == null) "" else data.toString
+      }
+    })
   }
 }

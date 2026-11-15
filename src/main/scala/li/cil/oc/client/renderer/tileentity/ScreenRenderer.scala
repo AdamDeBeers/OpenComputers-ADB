@@ -2,10 +2,7 @@ package li.cil.oc.client.renderer.tileentity
 
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.vertex.VertexConsumer
-import li.cil.oc.Constants
 import li.cil.oc.Settings
-import li.cil.oc.api
-import li.cil.oc.api.detail.ItemInfo
 import li.cil.oc.client.Textures
 import li.cil.oc.client.PacketSender
 import li.cil.oc.client.renderer.RenderTypes
@@ -13,6 +10,7 @@ import li.cil.oc.common.component.{TextBuffer => ComponentTextBuffer}
 import li.cil.oc.common.blockentity.Screen
 import li.cil.oc.integration.util.Wrench
 import li.cil.oc.util.RenderState
+import li.cil.oc.util.SableCompat
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.MultiBufferSource
 import net.minecraft.world.item.ItemStack
@@ -23,6 +21,7 @@ import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.renderer.blockentity.{BlockEntityRenderer => TileEntityRenderer}
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider
 import net.minecraft.world.entity.ai.attributes.Attributes
+import net.minecraft.world.level.block.Block
 import net.neoforged.api.distmarker.{Dist, OnlyIn}
 import net.minecraft.world.phys.{AABB, Vec3}
 import net.neoforged.bus.api.SubscribeEvent
@@ -177,12 +176,12 @@ class ScreenRenderer extends TileEntityRenderer[Screen] {
 
     if (!isFlatScreen) {
       val eye_pos   = Minecraft.getInstance.player.getEyePosition(dt)
-      val eye_delta = screen.getBlockPos.getY - eye_pos.y
-
-      val screenFacing = screen.facing.getOpposite
-      val x            = screen.getBlockPos.getX - eye_pos.x
-      val z            = screen.getBlockPos.getZ - eye_pos.z
-      if (screenFacing.getStepX * (x + 0.5) + screenFacing.getStepY * (eye_delta + 0.5) + screenFacing.getStepZ * (z + 0.5) < 0) return
+      val screenPosition = SableCompat.physicalPosition(screen.getLevel, screen.getBlockPos)
+      val screenFacing = SableCompat.physicalFacing(screen.getLevel, Vec3.atCenterOf(screen.getBlockPos), screen.facing).getOpposite
+      val x = screenPosition.x - eye_pos.x
+      val y = screenPosition.y - eye_pos.y
+      val z = screenPosition.z - eye_pos.z
+      if (screenFacing.getStepX * x + screenFacing.getStepY * y + screenFacing.getStepZ * z < 0) return
     }
 
     RenderSystem.setShaderColor(1, 1, 1, 1)
@@ -294,12 +293,9 @@ class ScreenRenderer extends TileEntityRenderer[Screen] {
     else Direction.UP
   }
 
-  private def isScreen(stack: ItemStack): Boolean = api.Items.get(stack) match {
-    case i: ItemInfo => i.block() match {
-      case _: li.cil.oc.common.block.Screen => true
-      case _                                => false
-    }
-    case _ => false
+  private def isScreen(stack: ItemStack): Boolean = Block.byItem(stack.getItem) match {
+    case _: li.cil.oc.common.block.Screen => true
+    case _                                => false
   }
 
   private def isFlatScreen: Boolean =
@@ -507,16 +503,29 @@ class ScreenRenderer extends TileEntityRenderer[Screen] {
     val player = Minecraft.getInstance.player
     val bounds = getRenderBoundingBox(screen)
 
-    val px = player.getX
-    val py = player.getY
-    val pz = player.getZ
+    // Block entities inside a Sable sub-level retain their plot coordinates,
+    // while the player is rendered in physical world space. Project the
+    // screen bounds before applying OC's own text-distance culling.
+    val corners = for {
+      x <- Array(bounds.minX, bounds.maxX)
+      y <- Array(bounds.minY, bounds.maxY)
+      z <- Array(bounds.minZ, bounds.maxZ)
+    } yield SableCompat.physicalPosition(screen.getLevel, new Vec3(x, y, z))
+    val physicalBounds = (
+      corners.map(_.x).min, corners.map(_.y).min, corners.map(_.z).min,
+      corners.map(_.x).max, corners.map(_.y).max, corners.map(_.z).max)
 
-    val ex = bounds.maxX - bounds.minX
-    val ey = bounds.maxY - bounds.minY
-    val ez = bounds.maxZ - bounds.minZ
-    val cx = bounds.minX + ex * 0.5
-    val cy = bounds.minY + ey * 0.5
-    val cz = bounds.minZ + ez * 0.5
+    val playerPosition = SableCompat.physicalPosition(screen.getLevel, new Vec3(player.getX, player.getY, player.getZ))
+    val px = playerPosition.x
+    val py = playerPosition.y
+    val pz = playerPosition.z
+
+    val ex = physicalBounds._4 - physicalBounds._1
+    val ey = physicalBounds._5 - physicalBounds._2
+    val ez = physicalBounds._6 - physicalBounds._3
+    val cx = physicalBounds._1 + ex * 0.5
+    val cy = physicalBounds._2 + ey * 0.5
+    val cz = physicalBounds._3 + ez * 0.5
     val dx = px - cx
     val dy = py - cy
     val dz = pz - cz

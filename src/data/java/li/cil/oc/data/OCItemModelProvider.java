@@ -116,6 +116,7 @@ public class OCItemModelProvider extends ItemModelProvider {
         basicItem(OCItems.MiningCardTier1().get());
         basicItem(OCItems.MiningCardTier2().get());
         basicItem(OCItems.MiningCardTier3().get());
+        basicItem(OCItems.NavigationCard().get());
         basicItem(OCItems.AudioCardTier1().get());
 
         // Upgrade components.
@@ -172,7 +173,7 @@ public class OCItemModelProvider extends ItemModelProvider {
         // Open Printers
         basicItem(OpenPrinter.BLACK_INK.get());
         basicItem(OpenPrinter.COLOR_INK.get());
-        basicItem(OpenPrinter.PAPER_SHREDS.get(), "shredded_paper");
+        basicItem(OpenPrinter.PAPER_SHREDS.get());
         // TODO: This feels like it should have a custom full/empty texture?
         basicItem(OpenPrinter.FOLDER.get(), "folder_empty");
     }

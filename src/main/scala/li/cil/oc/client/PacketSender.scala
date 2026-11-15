@@ -70,6 +70,13 @@ object PacketSender {
     pb.sendToServer()
   }
 
+  def sendTapeDriveControl(drive: menu.TapeDrive, action: Int): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.TapeDriveControl)
+    pb.writeInt(drive.containerId)
+    pb.writeByte(action.toByte)
+    pb.sendToServer()
+  }
+
   def sendKeyDown(address: String, char: Char, code: Int): Unit = {
     val pb = new SimplePacketBuilder(PacketType.KeyDown)
 
@@ -123,6 +130,14 @@ object PacketSender {
     val pb = new SimplePacketBuilder(PacketType.MachineItemStateRequest)
 
     pb.writeItemStack(stack, registryAccess)
+
+    pb.sendToServer()
+  }
+
+  def sendTabletCursorTick(id: String): Unit = {
+    val pb = new SimplePacketBuilder(PacketType.TabletCursorTick)
+
+    pb.writeUTF(id)
 
     pb.sendToServer()
   }

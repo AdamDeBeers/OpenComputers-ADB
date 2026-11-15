@@ -156,7 +156,7 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.getEnvironmentL
 
   def closestEntity[Type <: Entity](clazz: Class[Type], side: Direction = facing): Option[Entity] = {
     val bounds = BlockPosition(agent).offset(side).bounds
-    val candidates = level.getEntitiesOfClass(clazz, bounds, null)
+    val candidates = level.getEntitiesOfClass(clazz, bounds, (_: Type) => true)
     if (candidates.isEmpty) return None
     Some(candidates.asScala.minBy(e => distanceToSqr(e)))
   }
@@ -166,11 +166,11 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.getEnvironmentL
   }
 
   def entitiesInBlock[Type <: Entity](clazz: Class[Type], blockPos: BlockPosition): util.List[Type] = {
-    level.getEntitiesOfClass(clazz, blockPos.bounds, null)
+    level.getEntitiesOfClass(clazz, blockPos.bounds, (_: Type) => true)
   }
 
   private def adjacentItems: util.List[ItemEntity] = {
-    level.getEntitiesOfClass(classOf[ItemEntity], BlockPosition(agent).bounds.inflate(2, 2, 2), null)
+    level.getEntitiesOfClass(classOf[ItemEntity], BlockPosition(agent).bounds.inflate(2, 2, 2), _ => true)
   }
 
   private def collectDroppedItems(itemsBefore: Iterable[ItemEntity]): Unit = {
@@ -622,7 +622,7 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.getEnvironmentL
       else {
         callUsingItemInSlot(player.agent.equipmentInventory(), 0, _ => {
           this.player.setPos(this.player.getX - side.getStepX / 2.0, this.player.getY, this.player.getZ - side.getStepZ / 2.0)
-          val expGained: Int = PlayerInteractionManagerHelper.blockRemoving(player, pos)
+          val expGained: Int = PlayerInteractionManagerHelper.blockRemoving(player, pos, side)
           this.player.setPos(this.player.getX + side.getStepX / 2.0, this.player.getY, this.player.getZ + side.getStepZ / 2.0)
           if (expGained >= 0) {
             NeoForge.EVENT_BUS.post(new RobotBreakBlockEvent.Post(agent, expGained))

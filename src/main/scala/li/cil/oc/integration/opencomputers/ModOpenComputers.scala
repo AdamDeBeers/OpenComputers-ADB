@@ -10,9 +10,7 @@ import li.cil.oc.api.driver.item.Chargeable
 import li.cil.oc.api.internal
 import li.cil.oc.api.internal.Wrench
 import li.cil.oc.api.manual.PathProvider
-import li.cil.oc.api.prefab.ItemStackTabIconRenderer
-import li.cil.oc.api.prefab.ResourceContentProvider
-import li.cil.oc.api.prefab.TextureTabIconRenderer
+import li.cil.oc.api.prefab.{ItemStackTabIconRenderer, ResourceContentProvider, SpriteTabIconRenderer, TextureTabIconRenderer}
 import li.cil.oc.client.Textures
 import li.cil.oc.client.renderer.markdown.segment.render.BlockImageProvider
 import li.cil.oc.client.renderer.markdown.segment.render.ItemImageProvider
@@ -21,6 +19,7 @@ import li.cil.oc.client.renderer.markdown.segment.render.TextureImageProvider
 import li.cil.oc.common.EventHandler
 import li.cil.oc.common.Loot
 import li.cil.oc.common.SaveHandler
+import li.cil.oc.integration.SableTickBridge
 import li.cil.oc.common.block.SimpleBlock
 import li.cil.oc.common.event._
 import li.cil.oc.common.item.Analyzer
@@ -41,7 +40,7 @@ import li.cil.oc.server.machine.luac.NativeLua53Architecture
 import li.cil.oc.server.network.Waypoints
 import li.cil.oc.server.network.WirelessNetwork
 import li.cil.oc.util.Color
-import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.{BlockItem, ItemStack}
 import net.minecraft.core.BlockPos
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.player.Player
@@ -94,6 +93,7 @@ object ModOpenComputers extends ModProxy {
 
     OpenComputers.proxy.modBus.addListener(EventHandler.onRegisterCapabilities)
     OpenComputers.proxy.modBus.addListener(ChunkloaderUpgradeHandler.onRegisterTicketControllers)
+    OpenComputers.proxy.modBus.addListener(SableTickBridge.onRegisterTicketControllers)
 
     NeoForge.EVENT_BUS.register(EventHandler)
     NeoForge.EVENT_BUS.register(NanomachinesHandler.Common)
@@ -130,6 +130,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverQuadGraphicsCard)
     api.Driver.add(DriverInternetCard)
     api.Driver.add(DriverLinkedCard)
+    api.Driver.add(DriverNavigationCard)
     api.Driver.add(DriverLootDisk)
     api.Driver.add(DriverMemory)
     api.Driver.add(DriverCreativeMemory)
@@ -186,6 +187,7 @@ object ModOpenComputers extends ModProxy {
     api.Driver.add(DriverQuadGraphicsCard.Provider)
     api.Driver.add(DriverInternetCard.Provider)
     api.Driver.add(DriverLinkedCard.Provider)
+    api.Driver.add(DriverNavigationCard.Provider)
     api.Driver.add(DriverNetworkCard.Provider)
     api.Driver.add(DriverRedstoneCard.Provider)
     api.Driver.add(DriverWirelessNetworkCard.Provider)
@@ -342,7 +344,7 @@ object ModOpenComputers extends ModProxy {
     api.Manual.addProvider("oredict", TagImageProvider)
     OpenPrinter.registerManual()
 
-    api.Manual.addTab(new TextureTabIconRenderer(Textures.GUI.ManualHome), "oc:gui.Manual.Home", "%LANGUAGE%/index.md")
+    api.Manual.addTab(new SpriteTabIconRenderer(Textures.GUISprites.ManualHome), "oc:gui.Manual.Home", "%LANGUAGE%/index.md")
     api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("case1").createItemStack(1)), "oc:gui.Manual.Blocks", "%LANGUAGE%/block/index.md")
     api.Manual.addTab(new ItemStackTabIconRenderer(api.Items.get("cpu1").createItemStack(1)), "oc:gui.Manual.Items", "%LANGUAGE%/item/index.md")
   }
@@ -411,7 +413,7 @@ object ModOpenComputers extends ModProxy {
 
     private def checkBlacklisted(info: ItemInfo): String =
       if (info == null || Blacklist.contains(info.name)) null
-      else if (info.block != null) "%LANGUAGE%/block/" + info.name + ".md"
+      else if (info.item().isInstanceOf[BlockItem]) "%LANGUAGE%/block/" + info.name + ".md"
       else "%LANGUAGE%/item/" + info.name + ".md"
   }
 

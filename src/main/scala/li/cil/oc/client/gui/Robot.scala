@@ -1,26 +1,25 @@
 package li.cil.oc.client.gui
 
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.vertex.{BufferUploader, DefaultVertexFormat, PoseStack, Tesselator, VertexFormat}
+import com.mojang.blaze3d.vertex.PoseStack
 import li.cil.oc.{Localization, Settings}
 import li.cil.oc.api.internal.TextBuffer
+import li.cil.oc.client.{ComponentTracker, Textures, PacketSender => ClientPacketSender}
 import li.cil.oc.client.gui.widget.ProgressBar
 import li.cil.oc.client.renderer.TextBufferRenderCache
 import li.cil.oc.client.renderer.gui.BufferRenderer
-import li.cil.oc.client.{ComponentTracker, Textures, PacketSender => ClientPacketSender}
 import li.cil.oc.common.menu
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
-import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.client.gui.components.events.ContainerEventHandler
 import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.player.Inventory
 import org.lwjgl.glfw.GLFW
-import scala.jdk.CollectionConverters._
 
 class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   extends DynamicGuiContainer(state, playerInventory, name)
-  with traits.InputBuffer with ContainerEventHandler {
+    with traits.InputBuffer with ContainerEventHandler {
 
   override def containerTick(): Unit = {
     super.containerTick()
@@ -48,11 +47,12 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
 
   // Scroll offset for robot inventory.
   private var inventoryOffset = 0
+  private var lastInventorySize = inventoryContainer.mainInventorySize
   var isScrolling = false
 
-  private def canScroll = inventoryContainer.info.mainInvSize > 16
+  private def canScroll = inventoryContainer.mainInventorySize > 16
 
-  private def maxOffset = inventoryContainer.info.mainInvSize / 4 - 4
+  private def maxOffset = math.max(0, (inventoryContainer.mainInventorySize + 3) / 4 - 4)
 
   private val slotSize = 18
 
@@ -75,36 +75,58 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   private val scrollWidth = 8
   private val scrollHeight = 92
 
-  private val power = addCustomWidget(new ProgressBar(26, 156 - deltaY))
+  private var power: ProgressBar = _
 
   private val selectionSize = 20
-  private val selectionsStates = 17
-  private val selectionStepV = 1 / selectionsStates.toFloat
-
-  override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
-    powerButton.toggled = inventoryContainer.isRunning
-    scrollButton.active = canScroll
-    scrollButton.hoverOverride = isScrolling
-    if (inventoryContainer.info.mainInvSize < 16 + inventoryOffset * 4) {
-      if (inventoryOffset != 0) scrollTo(0)
-    }
-    super.render(graphics, mouseX, mouseY, dt)
-  }
 
   override protected def init(): Unit = {
     super.init()
-    powerButton = new ImageButton(leftPos + 5, topPos + 153 - deltaY, 18, 18, new Button.OnPress {
-      override def onPress(b: Button) = ClientPacketSender.sendRobotPower(inventoryContainer, !inventoryContainer.isRunning)
-    }, Textures.GUI.ButtonPower, canToggle = true)
-    scrollButton = new ImageButton(leftPos + scrollX + 1, topPos + scrollY + 1, 6, 13, new Button.OnPress {
-      override def onPress(b: Button) = ()
-    }, Textures.GUI.ButtonScroll)
-    addRenderableWidget(powerButton)
-    addRenderableWidget(scrollButton)
+    powerButton = addRenderableWidget(new ImageButton(
+      leftPos + 5, topPos + 153 - deltaY, 18, 18,
+      _ => ClientPacketSender.sendRobotPower(inventoryContainer, !inventoryContainer.isRunning),
+      Textures.GUISprites.ButtonPower
+    ))
+    scrollButton = addRenderableWidget(new ImageButton(leftPos + scrollX + 1, topPos + scrollY + 1, 6, 13, _ => (), Textures.GUISprites.ButtonScroll))
+    power = addRenderableWidget(new ProgressBar(leftPos + 26, topPos + 156 - deltaY))
   }
 
-  override def drawBuffer(stack: PoseStack): Unit = {
+  override def render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float): Unit = {
+    powerButton.toggled = inventoryContainer.isRunning
+    powerButton.setTooltip(Tooltip.create(Component.literal(
+      if (inventoryContainer.isRunning) Localization.Computer.TurnOff else Localization.Computer.TurnOn
+    )))
+
+    if (inventoryContainer.globalBufferSize == 0) {
+      power.level = 0
+      power.setTooltip(null)
+    } else {
+      power.level = inventoryContainer.globalBuffer.toDouble / inventoryContainer.globalBufferSize
+      val format = Localization.Computer.Power + ": %d%% (%d/%d)"
+      power.setTooltip(Tooltip.create(Component.literal(format.format(
+        100 * inventoryContainer.globalBuffer / inventoryContainer.globalBufferSize,
+        inventoryContainer.globalBuffer, inventoryContainer.globalBufferSize
+      ))))
+    }
+
+    val inventorySize = inventoryContainer.mainInventorySize
+    if (inventorySize != lastInventorySize) {
+      // Refresh the viewport immediately when the server sends capacity.
+      // As in the legacy GUI, return to the top if shrinking invalidates it.
+      if (inventoryOffset > maxOffset) {
+        isScrolling = false
+        scrollTo(0)
+      }
+      else scrollTo(inventoryOffset)
+      lastInventorySize = inventorySize
+    }
+    scrollButton.active = canScroll
+    scrollButton.hoverOverride = isScrolling
+    super.render(graphics, mouseX, mouseY, dt)
+  }
+
+  override def drawBuffer(graphics: GuiGraphics): Unit = {
     if (buffer != null) {
+      val stack = graphics.pose()
       stack.translate(bufferX.toFloat, bufferY.toFloat, 0f)
       stack.pushPose()
       stack.translate(-3, -3, 0)
@@ -134,34 +156,14 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   }
 
   override protected def drawSecondaryForegroundLayer(graphics: GuiGraphics, mouseX: Int, mouseY: Int): Unit = {
-    drawBufferLayer(graphics.pose())
-    if (isHovering(power.x, power.y, power.width, power.height, mouseX - leftPos, mouseY - topPos)) {
-      val tooltip = new java.util.ArrayList[Component]
-      val format = Localization.Computer.Power + ": %d%% (%d/%d)"
-      tooltip.add(Component.literal(format.format(
-        100 * inventoryContainer.globalBuffer / inventoryContainer.globalBufferSize,
-        inventoryContainer.globalBuffer, inventoryContainer.globalBufferSize)))
-      graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY)
-    }
-    if (powerButton.isMouseOver(mouseX, mouseY)) {
-      val tooltip = new java.util.ArrayList[Component]
-      tooltip.addAll(
-        if (inventoryContainer.isRunning)
-          Localization.Computer.TurnOff.linesIterator.map(Component.literal).toList.asJava
-        else
-          Localization.Computer.TurnOn.linesIterator.map(Component.literal).toList.asJava
-      )
-      graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY)
-    }
+    drawBufferLayer(graphics)
   }
 
   override protected def renderBg(graphics: GuiGraphics, dt: Float, mouseX: Int, mouseY: Int): Unit = {
-    RenderSystem.setShaderColor(1, 1, 1, 1)
     graphics.blit(if (buffer != null) Textures.GUI.Robot else Textures.GUI.RobotNoScreen, leftPos, topPos, 0, 0, imageWidth, imageHeight)
-    power.level = inventoryContainer.globalBuffer.toDouble / inventoryContainer.globalBufferSize
-    drawWidgets(graphics)
-    if (inventoryContainer.info.mainInvSize > 0) {
-      drawSelection(graphics.pose)
+
+    if (inventoryContainer.mainInventorySize > 0) {
+      drawSelection(graphics)
     }
 
     drawInventorySlots(graphics)
@@ -244,22 +246,14 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
     math.min(scaleX, scaleY)
   }
 
-  private def drawSelection(stack: PoseStack): Unit = {
+  private def drawSelection(graphics: GuiGraphics): Unit = {
     val slot = inventoryContainer.selectedSlot - inventoryOffset * 4
     if (slot >= 0 && slot < 16) {
-      Textures.bind(Textures.GUI.RobotSelection)
-      val now = System.currentTimeMillis() % 1000 / 1000.0f
-      val offsetV = (now * selectionsStates).toInt * selectionStepV
       val x = leftPos + inventoryX - 1 + (slot % 4) * (selectionSize - 2)
       val y = topPos + inventoryY - 1 + (slot / 4) * (selectionSize - 2)
-
-      val t = Tesselator.getInstance
-      val r = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX)
-      r.addVertex(stack.last.pose(), x.toFloat, y.toFloat, 0f).setUv(0f, offsetV)
-      r.addVertex(stack.last.pose(), x.toFloat, (y + selectionSize).toFloat, 0f).setUv(0f, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, (y + selectionSize).toFloat, 0f).setUv(1f, offsetV + selectionStepV)
-      r.addVertex(stack.last.pose(), (x + selectionSize).toFloat, y.toFloat, 0f).setUv(1f, offsetV)
-      BufferUploader.drawWithShader(r.buildOrThrow())
+      RenderSystem.enableBlend()
+      graphics.blitSprite(Textures.GUISprites.RobotSelection, x, y, selectionSize, selectionSize)
+      RenderSystem.disableBlend()
     }
   }
 }

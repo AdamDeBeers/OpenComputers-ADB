@@ -27,8 +27,10 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.TimeUnit;
 
 public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock {
@@ -95,26 +97,56 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
         protected final String[] methodNames;
         protected final Map<String, FakeComputerAccess> accesses = new HashMap<>();
         protected final Map<String, Method> reflectedMethods = new HashMap<>();
+        protected final Map<String, Integer> dynamicMethods = new HashMap<>();
+        protected final AtomicLong nextTaskId = new AtomicLong();
 
         public Environment(final IPeripheral peripheral) {
             this.peripheral = peripheral;
 
-            if (peripheral instanceof IDynamicPeripheral dynamic) {
-                methodNames = dynamic.getMethodNames();
-            } else {
-                final List<String> names = new ArrayList<>();
+            final LinkedHashSet<String> names = new LinkedHashSet<>();
 
-                for (Method method : peripheral.getClass().getMethods()) {
-                    if (method.isAnnotationPresent(LuaFunction.class)) {
-                        reflectedMethods.put(method.getName(), method);
-                        names.add(method.getName());
+            if (peripheral instanceof IDynamicPeripheral dynamic) {
+                final String[] dynamicNames = dynamic.getMethodNames();
+
+                for (int i = 0; i < dynamicNames.length; i++) {
+                    final String name = dynamicNames[i];
+                    if (dynamicMethods.putIfAbsent(name, i) == null) {
+                        names.add(name);
                     }
                 }
-
-                methodNames = names.toArray(new String[0]);
             }
 
+            // CC:T exposes annotated and dynamic methods together. Some
+            // peripherals (notably AdvancedPeripherals' BasePeripheral)
+            // implement IDynamicPeripheral while keeping their concrete API
+            // in @LuaFunction methods.
+            for (Method method : peripheral.getClass().getMethods()) {
+                final LuaFunction annotation = method.getAnnotation(LuaFunction.class);
+                if (annotation == null || java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
+                    continue;
+                }
+
+                final String[] exposedNames = annotation.value();
+                if (exposedNames.length == 0) {
+                    addReflectedMethod(method.getName(), method, names);
+                } else {
+                    for (String name : exposedNames) {
+                        addReflectedMethod(name, method, names);
+                    }
+                }
+            }
+
+            methodNames = names.toArray(new String[0]);
+
             setNode(Network.newNode(this, Visibility.Network).create());
+        }
+
+        private void addReflectedMethod(final String name, final Method method, final Set<String> names) {
+            // Preserve the existing dynamic-method precedence if a peripheral
+            // happens to use the same name for both APIs.
+            if (!dynamicMethods.containsKey(name) && reflectedMethods.putIfAbsent(name, method) == null) {
+                names.add(name);
+            }
         }
 
         @Override
@@ -133,27 +165,13 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
             }
 
             final Object[] argArray = CallableHelper.convertArguments(args);
+            final ILuaContext luaContext = new SynchronousLuaContext(context, nextTaskId);
 
-            if (peripheral instanceof IDynamicPeripheral dynamic) {
-                final String[] names = dynamic.getMethodNames();
-
-                int index = -1;
-
-                for (int i = 0; i < names.length; i++) {
-                    if (names[i].equals(name)) {
-                        index = i;
-                        break;
-                    }
-                }
-
-                if (index == -1) {
-                    throw new NoSuchMethodException();
-                }
-
+            if (peripheral instanceof IDynamicPeripheral dynamic && dynamicMethods.containsKey(name)) {
                 return dynamic.callMethod(
                         access,
-                        UnsupportedLuaContext.instance(),
-                        index,
+                        luaContext,
+                        dynamicMethods.get(name),
                         new ObjectArguments(argArray)
                 ).getResult();
             }
@@ -164,14 +182,38 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
                 throw new NoSuchMethodException();
             }
 
-            final Object[] invokeArgs = buildInvokeArguments(method, argArray);
+            final Object[] invokeArgs = buildInvokeArguments(method, argArray, luaContext, access);
 
-            final Object result = method.invoke(peripheral, invokeArgs);
+            final Object result;
+
+            try {
+                result = method.invoke(peripheral, invokeArgs);
+            } catch (final InvocationTargetException exception) {
+                // Preserve the peripheral's actual exception. Reflection
+                // otherwise exposes only InvocationTargetException, whose
+                // message is commonly null and becomes "unknown error" in
+                // the Lua callback layer.
+                final Throwable cause = exception.getCause();
+
+                if (cause instanceof Exception targetException) {
+                    throw targetException;
+                }
+
+                if (cause instanceof Error targetError) {
+                    throw targetError;
+                }
+
+                throw exception;
+            }
+
+            if (result instanceof MethodResult methodResult) {
+                return methodResult.getResult();
+            }
 
             return wrapResult(result);
         }
 
-        private Object[] buildInvokeArguments(final Method method, final Object[] args) {
+        private Object[] buildInvokeArguments(final Method method, final Object[] args, final ILuaContext luaContext, final IComputerAccess access) {
             final Class<?>[] parameterTypes = method.getParameterTypes();
             final Object[] invokeArgs = new Object[parameterTypes.length];
 
@@ -181,9 +223,11 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
                 final Class<?> type = parameterTypes[i];
 
                 if (type == IComputerAccess.class) {
-                    invokeArgs[i] = null;
+                    invokeArgs[i] = access;
                 } else if (type == ILuaContext.class) {
-                    invokeArgs[i] = UnsupportedLuaContext.instance();
+                    invokeArgs[i] = luaContext;
+                } else if (type == IArguments.class) {
+                    invokeArgs[i] = new ObjectArguments(args);
                 } else if (type == ObjectArguments.class) {
                     invokeArgs[i] = new ObjectArguments(args);
                 } else {
@@ -196,6 +240,10 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
         }
 
         private Object coerce(final Object value, final Class<?> type) {
+            if (type == Optional.class) {
+                return Optional.ofNullable(value);
+            }
+
             if (value == null) {
                 return defaultValue(type);
             }
@@ -246,6 +294,10 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
         }
 
         private Object defaultValue(final Class<?> type) {
+            if (type == Optional.class) {
+                return Optional.empty();
+            }
+
             if (!type.isPrimitive()) {
                 return null;
             }
@@ -444,19 +496,49 @@ public final class DriverPeripheral implements li.cil.oc.api.driver.DriverBlock 
             }
         }
 
-        public static final class UnsupportedLuaContext implements ILuaContext {
-            private static final UnsupportedLuaContext Instance = new UnsupportedLuaContext();
+        /**
+         * The enclosing ManagedPeripheral callback is non-direct, so OC has
+         * already moved execution to the server thread before this context is
+         * used. CC:T main-thread tasks can therefore run synchronously here.
+         */
+        public static final class SynchronousLuaContext implements ILuaContext {
+            private final Context context;
+            private final AtomicLong nextTaskId;
 
-            private UnsupportedLuaContext() {
-            }
-
-            public static UnsupportedLuaContext instance() {
-                return Instance;
+            public SynchronousLuaContext(final Context context, final AtomicLong nextTaskId) {
+                this.context = context;
+                this.nextTaskId = nextTaskId;
             }
 
             @Override
-            public long issueMainThreadTask(@NotNull LuaTask luaTask) throws LuaException {
-                return 0;
+            public long issueMainThreadTask(@NotNull final LuaTask task) throws LuaException {
+                final long taskId = nextTaskId.getAndIncrement();
+
+                try {
+                    signalTaskCompleted(taskId, true, task.execute());
+                } catch (final LuaException | RuntimeException e) {
+                    signalTaskCompleted(taskId, false, new Object[]{e.getMessage()});
+                }
+
+                return taskId;
+            }
+
+            @Override
+            public MethodResult executeMainThreadTask(@NotNull final LuaTask task) throws LuaException {
+                final Object[] result = task.execute();
+                return MethodResult.of(result == null ? new Object[0] : result);
+            }
+
+            private void signalTaskCompleted(final long taskId, final boolean success, final Object[] result) {
+                final Object[] signal = new Object[2 + (result == null ? 0 : result.length)];
+                signal[0] = taskId;
+                signal[1] = success;
+
+                if (result != null) {
+                    System.arraycopy(result, 0, signal, 2, result.length);
+                }
+
+                context.signal("task_completed", signal);
             }
         }
     }

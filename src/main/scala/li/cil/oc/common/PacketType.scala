@@ -31,6 +31,8 @@ object PacketType extends Enumeration {
   HologramScale,
   HologramTranslation,
   HologramValues,
+  ProjectorFrame,
+  ProjectorPowerChange,
   LootDisk,
   CyclingDisk,
   NanomachinesConfiguration,
@@ -110,6 +112,14 @@ object PacketType extends Enumeration {
   LootEEPROM,
 
   RobotFlagChange,
+
+  // Client -> Server. Sent while a tablet is held by the client's cursor.
+  TabletCursorTick,
+
+  // Appended to preserve packet ordinals used by existing clients.
+  ComputronicsTone,
+  TapeDriveControl,
+  TapeAudioStart,
 
   EndOfList = Value
 }

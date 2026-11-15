@@ -13,15 +13,19 @@ Keep in mind that some of these may not be available, depending on the recipe se
 ## Components
 
 ### Input / Output
+* [Audio Cable](audio_cable.md)
 * [Hologram Projector](hologram1.md)
 * [Holo Screen](holoscreen1.md)
 * [Keyboard](keyboard.md)
+* [Projector](projector.md)
 * [Screen](screen1.md)
+* [Speaker](speaker.md)
 * [Flatscreen](frontflatscreen1.md)
 
 ### Storage
 * [Disk Drive](diskdrive.md)
 * [RAID](raid.md)
+* [Tape Drive](tape_drive.md)
 
 ### Extensions
 * [Adapter](adapter.md)
@@ -37,6 +41,12 @@ Keep in mind that some of these may not be available, depending on the recipe se
 * [Assembler](assembler.md)
 * [Block of Chamelium](chameliumblock.md)
 * [Disassembler](disassembler.md)
+
+## OpenPrinter
+* [Document Printer](documentprinter.md)
+* [File Cabinet](filecabinet.md)
+* [Shredder](shredder.md)
+* [Briefcase](briefcase.md)
 
 ## Networking
 * [Cable](cable.md)

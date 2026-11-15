@@ -3,6 +3,13 @@ package li.cil.oc
 import li.cil.oc.util.ItemUtils
 
 object Constants {
+  object  SectionName {
+    final val Component = "25_components"
+    final val Tools = "49_tools"
+    final val Materials = "50_materials"
+    final val Upgrade = "80_upgrade"
+    final val Misc = "99_misc"
+  }
 
   object BlockName {
     final val Adapter = "adapter"
@@ -24,6 +31,7 @@ object Constants {
     final val HologramTier1 = "hologram1"
     final val HologramTier2 = "hologram2"
     final val HologramTier3 = "hologram3"
+    final val Projector = "projector"
     final val HoloScreenTier1 = "holoscreen1"
     final val HoloScreenTier2 = "holoscreen2"
     final val HoloScreenTier3 = "holoscreen3"
@@ -56,6 +64,9 @@ object Constants {
     final val Rack = "rack"
     final val Transposer = "transposer"
     final val Waypoint = "waypoint"
+    final val TapeDrive = "tape_drive"
+    final val AudioCable = "audio_cable"
+    final val Speaker = "speaker"
 
     def Case(tier: Int): String = ItemUtils.caseNameWithTierSuffix("case", tier)
   }
@@ -72,6 +83,12 @@ object Constants {
     final val APUTier3 = "apu3"
     final val ArrowKeys = "arrowkeys"
     final val AudioCardTier1 = "audiocard1"
+    final val Tape = "tape"
+    final val TapeCopper = "tape_copper"
+    final val TapeGold = "tape_gold"
+    final val TapeDiamond = "tape_diamond"
+    final val TapeNetherStar = "tape_nether_star"
+    final val TapeSteel = "tape_steel"
     final val BatteryUpgradeTier1 = "batteryupgrade1"
     final val BatteryUpgradeTier2 = "batteryupgrade2"
     final val BatteryUpgradeTier3 = "batteryupgrade3"
@@ -155,6 +172,7 @@ object Constants {
     final val MicrocontrollerCaseTier3 = "microcontrollercase3"
     final val Nanomachines = "nanomachines"
     final val NavigationUpgrade = "navigationupgrade"
+    final val NavigationCard = "navigationcard"
     final val NetheriteSilicon = "netheritesilicon"
     final val NetworkCard = "lancard"
     final val NumPad = "numpad"

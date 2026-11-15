@@ -2,16 +2,19 @@ package li.cil.oc
 
 import li.cil.oc.client.ColorHandler
 import li.cil.oc.common.blockentity.BlockEntityTypes
+import li.cil.oc.common.condition.ContentConditions
 import li.cil.oc.common.datacomponents.OCComponents
 import li.cil.oc.common.entity.EntityTypes
 import li.cil.oc.common.init.{OCBlocks, OCItems}
 import li.cil.oc.common.menu.MenuTypes
+import li.cil.oc.common.VillageContent
 import li.cil.oc.common.openprinter.OpenPrinter
 import li.cil.oc.common.recipe.Recipes
 import li.cil.oc.common.{IMC, Proxy}
 import li.cil.oc.integration.Mods
 import li.cil.oc.server.command.CommandHandler
-import li.cil.oc.server.loot.LootFunctions
+import li.cil.oc.server.loot.{LootConditions, LootFunctions}
+import li.cil.oc.server.loot.LootTableHandler
 import li.cil.oc.util.ThreadPoolFactory
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.{IEventBus, SubscribeEvent}
@@ -21,7 +24,7 @@ import net.neoforged.fml.loading.FMLPaths
 import net.neoforged.fml.{InterModComms, ModContainer}
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforgespi.Environment
-import org.apache.logging.log4j.{LogManager, Logger}
+import org.apache.logging.log4j.{Logger, LogManager}
 
 import java.nio.file.Paths
 import scala.jdk.CollectionConverters._
@@ -63,12 +66,15 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
 
   modBus.register(this)
   OCComponents.init(modBus)
+  ContentConditions.init(modBus)
   OCItems.init(modBus)
   OCBlocks.init(modBus)
   CreativeTab.CREATIVE_TABS.register(modBus)
   BlockEntityTypes.init(modBus)
   Recipes.init(modBus)
+  LootConditions.init(modBus)
   LootFunctions.init(modBus)
+  VillageContent.init(modBus)
   EntityTypes.ENTITY_TYPES.register(modBus)
   modBus.addListener(EntityTypes.onAttributeCreation)
   MenuTypes.MENU.register(modBus)
@@ -78,6 +84,8 @@ class OpenComputers(modBus: IEventBus, modContainer: ModContainer) {
   modBus.register(OpenComputers.proxy)
   OpenComputers.proxy.preInit()
   NeoForge.EVENT_BUS.register(ThreadPoolFactory)
+  NeoForge.EVENT_BUS.register(LootTableHandler.INSTANCE)
+  NeoForge.EVENT_BUS.register(VillageContent.INSTANCE)
   NeoForge.EVENT_BUS.addListener(CommandHandler.onRegisterCommands)
   modBus.register(ColorHandler)
 

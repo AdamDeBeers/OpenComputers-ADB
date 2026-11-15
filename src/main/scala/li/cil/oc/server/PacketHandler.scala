@@ -77,6 +77,8 @@ object PacketHandler extends CommonPacketHandler {
       case PacketType.RobotAssemblerStart => onRobotAssemblerStart(p)
       case PacketType.RobotStateRequest => onRobotStateRequest(p)
       case PacketType.ServerPower => onServerPower(p)
+      case PacketType.TabletCursorTick => onTabletCursorTick(p)
+      case PacketType.TapeDriveControl => onTapeDriveControl(p)
       case PacketType.TextBufferInit => onTextBufferInit(p)
       case PacketType.WaypointLabel => onWaypointLabel(p)
       case PacketType.HoloScreenResize => onHoloScreenResize(p)
@@ -93,6 +95,23 @@ object PacketHandler extends CommonPacketHandler {
         if (holo.resize(resizeSide)) {
           holo.getLevel.sendBlockUpdated(holo.getBlockPos, holo.getBlockState, holo.getBlockState, 3)
         }
+      case _ =>
+    }
+  }
+
+  def onTapeDriveControl(p: PacketParser): Unit = {
+    val containerId = p.readInt()
+    val action = p.readByte().toInt
+    p.player match {
+      case player: ServerPlayer if player.containerMenu.containerId == containerId && player.containerMenu.stillValid(player) =>
+        player.containerMenu match {
+          case drive: menu.TapeDrive => drive.otherInventory match {
+            case tape: li.cil.oc.common.blockentity.TapeDrive => tape.handleControl(action, player)
+            case _ => logForgedPacket(player)
+          }
+          case _ => logForgedPacket(player)
+        }
+      case player: ServerPlayer => logForgedPacket(player)
       case _ =>
     }
   }
@@ -116,7 +135,10 @@ object PacketHandler extends CommonPacketHandler {
         }
         case tablet: menu.Tablet if tablet.containerId == containerId =>
           tablet.otherInventory match {
-            case wrapper: TabletWrapper => trySetComputerPower(wrapper.machine, setPower, player)
+            case wrapper: TabletWrapper =>
+              trySetComputerPower(wrapper.machine, setPower, player)
+              wrapper.syncRunningState()
+              player.containerMenu.broadcastChanges()
             case _ => logForgedPacket(player)
           }
         case _ => logForgedPacket(player)
@@ -412,6 +434,11 @@ object PacketHandler extends CommonPacketHandler {
     case _ => // ignore
   }
 
+  def onTabletCursorTick(p: PacketParser): Unit = p.player match {
+    case player: ServerPlayer => Tablet.tickCursorHeld(player, p.readUTF())
+    case _ => // Ignore.
+  }
+
   def onTextBufferInit(p: PacketParser): Unit = {
     val address = p.readUTF()
     p.player match {
@@ -453,6 +480,7 @@ object PacketHandler extends CommonPacketHandler {
         case player: ServerPlayer if player.distanceToSqr(waypoint.x + 0.5, waypoint.y + 0.5, waypoint.z + 0.5) <= 64 =>
           if (label != waypoint.label) {
             waypoint.label = label
+            waypoint.setChanged()
             PacketSender.sendWaypointLabel(waypoint)
           }
         case _ =>

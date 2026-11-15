@@ -21,6 +21,7 @@ object Mods {
 
   def All: ArrayBuffer[ModBase] = knownMods.clone()
   val Create = new SimpleMod(IDs.Create)
+  val Sable = new SimpleMod(IDs.Sable, "[2.0,3)")
   val ComputerCraft = new SimpleMod(IDs.ComputerCraft)
   val NeoForge = new SimpleMod(IDs.Forge)
   val JustEnoughItems = new SimpleMod(IDs.JustEnoughItems)
@@ -33,7 +34,9 @@ object Mods {
   val Minecraft = new SimpleMod(IDs.Minecraft)
   val OpenComputers = new SimpleMod(IDs.OpenComputers)
   val EnderStorage = new SimpleMod(IDs.EnderStorage)
+  val CBMultipart = new SimpleMod(IDs.CBMultipart)
   val ProjectRedTransmission = new SimpleMod(IDs.ProjectRedTransmission)
+  val ImmersiveEngineering = new SimpleMod(IDs.ImmersiveEngineering)
 
   // ----------------------------------------------------------------------- //
 
@@ -49,7 +52,9 @@ object Mods {
     integration.dashpanels.ModDashPanels.INSTANCE,
     integration.tesseract.ModTesseract.INSTANCE,
     integration.enderstorage.ModEnderStorage,
+    integration.multipart.ModCBMultipart,
     integration.projectred.ModProjectRed,
+    integration.immersiveengineering.ModImmersiveEngineering,
 
     // We go late to ensure all other mod integration is done, e.g. to
     // allow properly checking if wireless redstone is present.
@@ -104,6 +109,7 @@ object Mods {
 
   object IDs {
     final val Create = "create"
+    final val Sable = "sable"
     final val ComputerCraft = "computercraft"
     final val Forge = "forge"
     final val JustEnoughItems = "jei"
@@ -116,7 +122,9 @@ object Mods {
     final val Minecraft = "minecraft"
     final val OpenComputers = "opencomputers"
     final val EnderStorage = "enderstorage"
+    final val CBMultipart = "cb_multipart"
     final val ProjectRedTransmission = "projectred_transmission"
+    final val ImmersiveEngineering = "immersiveengineering"
   }
 
   // ----------------------------------------------------------------------- //

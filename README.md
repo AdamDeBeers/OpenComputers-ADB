@@ -1,4 +1,4 @@
-![OpenComputers](assets/misc/banner_new.png)
+![OpenComputers](assets/misc/banner.png)
 
 # OpenComputers for Minecraft 1.21.1
 
@@ -16,18 +16,16 @@ on modern Minecraft.
 - Minecraft 1.21.1
 - NeoForge 21.1 or newer
 - Java 21
-- ScalableCatsForce for NeoForge 3.3.3
+- Scala is bundled in the OpenComputers JAR.
 
 ## Installation
 
-Download a release or CI build and put both of these files in the instance's
+Download a release or CI build and put the OpenComputers JAR in the instance's
 `mods` directory:
 
 - `opencomputers-*.jar`
-- `scalablecatsforce-neoforge-*-with-library.jar`
 
-The ScalableCatsForce JAR is included beside OpenComputers in local build
-outputs and CI artifacts.
+ScalableCatsForce may remain installed when it is required by other mods.
 
 ## Building
 
@@ -58,10 +56,9 @@ task already depends on `prepareClientRun`, including after `clean`.
 ## Project status
 
 The port currently targets NeoForge 1.21.1. Remaining integrations and planned
-features are tracked in [ROADMAP.md](ROADMAP.md). The original
-[OpenComputers wiki](https://ocdoc.cil.li/) is still useful for gameplay and Lua
-API concepts, but some installation and mod-integration details describe older
-Minecraft versions.
+features are tracked in [ROADMAP.md](ROADMAP.md). The 
+[OpenComputers wiki](https://ocr.michiyo.me/wiki) is useful for gameplay and Lua
+API concepts.
 
 Useful project links:
 
@@ -71,17 +68,11 @@ Useful project links:
 - [In-game manual sources](src/main/resources/assets/opencomputers/doc)
 - [Lua/OpenOS sources](src/main/resources/assets/opencomputers/loot)
 - [Java API sources](src/main/java/li/cil/oc/api)
+- [Development Builds](https://ci.pc-logix.com/job/OpenComputers%20Rebooted)
 
 ## Contributing
 
-Bug fixes, focused ports, documentation improvements, translations, and small
-Lua programs are welcome. Please keep changes scoped, preserve compatibility
-where practical, and run `gradlew build` before opening a pull request.
-
-Translations live in
-[`src/main/resources/assets/opencomputers/lang`](src/main/resources/assets/opencomputers/lang).
-The English locale is the source of truth for keys. Instructions for adding
-loot-disk programs are in the [loot README](src/main/resources/assets/opencomputers/loot/README.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Using the API
 

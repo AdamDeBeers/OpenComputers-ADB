@@ -15,13 +15,10 @@ import scala.collection.mutable
 
 @OnlyIn(Dist.CLIENT)
 object ModelInitialization {
-  final val CableBlockLocation           = loc(Constants.BlockName.Cable,             "")
-  final val CableItemLocation            = loc(Constants.BlockName.Cable,             "inventory")
   final val NetSplitterBlockLocation     = loc(Constants.BlockName.NetSplitter,       "")
   final val PrintBlockLocation           = loc(Constants.BlockName.Print,             "")
   final val PrintItemLocation            = loc(Constants.BlockName.Print,             "inventory")
   final val RobotItemLocation            = loc(Constants.BlockName.Robot,             "inventory")
-
   private def loc(name: String, variant: String): ModelResourceLocation = {
     val id = ResourceLocation.fromNamespaceAndPath(Settings.resourceDomain, name)
     if (variant == "inventory") ModelResourceLocation.inventory(id)
@@ -32,7 +29,6 @@ object ModelInitialization {
 
   private def rebuildModelRemappings(): Unit = {
     modelRemappings.clear()
-    registerBlockRemapping(OCBlocks.Cable.get(), CableBlockLocation)
     registerBlockRemapping(OCBlocks.NetSplitter.get(), NetSplitterBlockLocation)
     registerBlockRemapping(OCBlocks.Print.get(), PrintBlockLocation)
   }
@@ -57,13 +53,10 @@ object ModelInitialization {
     rebuildModelRemappings()
     val registry = e.getModels
 
-    registry.put(CableBlockLocation,           CableModel)
-    registry.put(CableItemLocation,            CableModel)
     registry.put(NetSplitterBlockLocation,     NetSplitterModel)
     registry.put(PrintBlockLocation,           PrintModel)
     registry.put(PrintItemLocation,            PrintModel)
     registry.put(RobotItemLocation,            RobotModel)
-    registry.put(loc(Constants.ItemName.Drone, "inventory"), DroneModel)
 
     val modelOverrides = Map[String, BakedModel => BakedModel](
       Constants.BlockName.ScreenTier1 -> (_ => ScreenModel),

@@ -37,11 +37,15 @@ public class DataGenerators {
         generator.addProvider(o -> new OCItemTagsProvider(o, registries, blockTags.contentsGetter(), existingFiles));
         generator.addProvider(o -> new OCDamageTypeTagsProvider(o, registries, existingFiles));
 
+        generator.addProvider(o -> new OCEEPROMProvider(o, registries, existingFiles));
+        generator.addProvider(o -> new OCLootDiskProvider(o, registries, existingFiles));
+
         generator.addProvider(o -> new OCRecipeProvider(o, registries));
         generator.addProvider(o -> new AdvancementProvider(o, registries, existingFiles, List.of(new OCAdvancementProvider())));
 
         generator.addProvider(o -> new LootTableProvider(o, Set.of(), List.of(
-            new LootTableProvider.SubProviderEntry(OCBlockLoot::new, LootContextParamSets.BLOCK)
+            new LootTableProvider.SubProviderEntry(OCBlockLoot::new, LootContextParamSets.BLOCK),
+            new LootTableProvider.SubProviderEntry(r -> new OCPresentLoot(), LootContextParamSets.EMPTY)
         ), registries));
 
         generator.addProvider(o -> new OCItemModelProvider(o, existingFiles));

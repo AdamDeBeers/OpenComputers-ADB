@@ -102,6 +102,9 @@ neoForge {
         server {
             server()
 
+            // Keep client-only mods in the client run's game directory.
+            gameDirectory = project.file('run/server')
+
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             programArgument '--nogui'
         }
@@ -124,6 +127,10 @@ neoForge {
             )
         }
     }
+}
+
+tasks.named('runServer', JavaExec).configure {
+    standardInput = System.in
 }
 
 sourceSets.main.resources {
@@ -168,6 +175,12 @@ repositories {
         }
     }
     exclusiveContent {
+        forRepositories(maven { url = "https://repo.sleeping.town/" })
+        filter {
+            includeGroup "dev.emi"
+        }
+    }
+    exclusiveContent {
         forRepositories(maven { url = "https://chickenbones.net/maven/" })
         filter {
             includeGroup "codechicken"
@@ -190,9 +203,9 @@ repositories {
         }
     }
     exclusiveContent {
-        forRepositories(maven { url = "https://maven.kotori316.com" })
+        forRepositories(maven { url = "https://maven.ryanhcode.dev/releases" })
         filter {
-            includeModule("com.kotori316", "scalablecatsforce-neoforge")
+            includeGroup "dev.ryanhcode.sable-companion"
         }
     }
     exclusiveContent {
@@ -206,22 +219,112 @@ repositories {
 }
 
 dependencies {
-    compileOnly("org.scala-lang:scala-library:2.13.12")
-    runtimeOnly("com.kotori316:scalablecatsforce-neoforge:3.3.3-build-15:with-library") {
-        transitive = false
+    // OpenComputers is predominantly Scala. Bundle the runtime so the mod
+    // does not require a separate Scala loader/library mod at runtime.
+    // Keep Scala in the parent mod and relocate it into a private namespace.
+    // This lets OpenComputers coexist with older Scala mods which still ship
+    // ScalableCatsForce and its scala.library module.
+    embedded("org.scala-lang:scala-library:2.13.12")
+
+    jarJar(implementation(group: "com.typesafe", name: "config")) {
+        version {
+            strictly "[1.4.5,)"
+            prefer "1.4.5"
+        }
     }
 
-    embedded "com.typesafe:config:1.4.5"
-    embedded ":OC-LuaJ:20220907.1"
-    embedded ":OC-JNLua-Natives:20220928.1"
+    // Every build uses the checksummed GitHub Releases by default. A caller may
+    // supply explicit directories to test a candidate artifact before release.
+    def runtimeDependenciesDirectory = layout.buildDirectory.dir('runtime-dependencies').get().asFile
+    def usePublishedRuntimeDependencies = !findProperty('luaJDirectory') && !findProperty('jnluaNativesDirectory')
+    def luaJDirectory = findProperty('luaJDirectory') ?: (usePublishedRuntimeDependencies
+        ? new File(runtimeDependenciesDirectory, 'luaj') : null)
+    def jnluaNativesDirectory = findProperty('jnluaNativesDirectory') ?: (usePublishedRuntimeDependencies
+        ? new File(runtimeDependenciesDirectory, 'jnlua') : null)
+
+    def luaJ = luaJDirectory
+        ? files(new File(luaJDirectory, 'OC-LuaJ.jar'))
+        : files()
+    compileOnly luaJ
+    embedded luaJ
+
+    def jnluaNatives = jnluaNativesDirectory
+        ? files(new File(jnluaNativesDirectory, 'OC-JNLua-Natives.jar'))
+        : files()
+    embedded jnluaNatives
+
+    def downloadRuntimeDependencies = tasks.register('downloadRuntimeDependencies') {
+        onlyIf { usePublishedRuntimeDependencies }
+        // Jenkins refreshes its checkout for each build; local Gradle builds
+        // reuse verified downloads until `clean` removes build/.
+        outputs.upToDateWhen { System.getenv('JENKINS_URL') == null }
+        outputs.files(
+            new File(runtimeDependenciesDirectory, 'luaj/OC-LuaJ.jar'),
+            new File(runtimeDependenciesDirectory, 'luaj/OC-LuaJ-SHA256SUMS.txt'),
+            new File(runtimeDependenciesDirectory, 'jnlua/OC-JNLua-Natives.jar'),
+            new File(runtimeDependenciesDirectory, 'jnlua/OC-JNLua-Natives-SHA256SUMS.txt'))
+        doLast {
+            def download = { String url, File target ->
+                target.parentFile.mkdirs()
+                new URL(url).withInputStream { input -> target.withOutputStream { output -> output << input } }
+            }
+            def verify = { File artifact, File checksum ->
+                def expected = checksum.text.trim().tokenize().first()
+                def digest = java.security.MessageDigest.getInstance('SHA-256')
+                artifact.withInputStream { input ->
+                    byte[] buffer = new byte[8192]
+                    for (int read; (read = input.read(buffer)) >= 0;) digest.update(buffer, 0, read)
+                }
+                def actual = digest.digest().collect { String.format('%02x', it) }.join()
+                if (!actual.equalsIgnoreCase(expected)) throw new GradleException("Checksum mismatch for ${artifact.name}")
+            }
+            def luaJJar = new File(runtimeDependenciesDirectory, 'luaj/OC-LuaJ.jar')
+            def luaJChecksum = new File(runtimeDependenciesDirectory, 'luaj/OC-LuaJ-SHA256SUMS.txt')
+            def jnluaJar = new File(runtimeDependenciesDirectory, 'jnlua/OC-JNLua-Natives.jar')
+            def jnluaChecksum = new File(runtimeDependenciesDirectory, 'jnlua/OC-JNLua-Natives-SHA256SUMS.txt')
+            download('https://github.com/PC-Logix/OC-LuaJ/releases/latest/download/OC-LuaJ.jar', luaJJar)
+            download('https://github.com/PC-Logix/OC-LuaJ/releases/latest/download/OC-LuaJ-SHA256SUMS.txt', luaJChecksum)
+            download('https://github.com/PC-Logix/OC-JNLua/releases/latest/download/OC-JNLua-Natives.jar', jnluaJar)
+            download('https://github.com/PC-Logix/OC-JNLua/releases/latest/download/OC-JNLua-Natives-SHA256SUMS.txt', jnluaChecksum)
+            verify(luaJJar, luaJChecksum)
+            verify(jnluaJar, jnluaChecksum)
+        }
+    }
+    if (usePublishedRuntimeDependencies) {
+        // LuaJ is needed on Scala's compile classpath and both JARs are needed
+        // for packaging. Do not attach this to `clean`: it destroys build/.
+        tasks.matching { it.name in ['compileJava', 'compileScala', 'jarJar'] }.configureEach {
+            dependsOn(downloadRuntimeDependencies)
+        }
+    }
+
+    // Sable Companion is deliberately bundled. It has a safe identity
+    // implementation when Sable is absent and is overridden through its
+    // service provider when Sable is installed.
+    jarJar(api("dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:[${sable_companion_version},)")) {
+        version {
+            prefer(sable_companion_version)
+        }
+    }
+
+    // Load Sable in the IDE runs for integration testing, without making it
+    // part of the published OpenComputers dependency set.
+    compileOnly("maven.modrinth:sable:${sable_version}")
+    devRuntimeOnly("maven.modrinth:sable:${sable_version}")
+
+    // The bundled Aeronautics release contains the Simulated, Aeronautics,
+    // and Offroad content needed to assemble and test actual ships in IDE
+    // runs. It remains a development-only runtime dependency.
+    devRuntimeOnly("maven.modrinth:create-aeronautics:${aeronautics_version}")
 
     // ModDevGradle 2.x only discovers actual mods from the normal runtime
     // classpath on Minecraft 1.21.1. These are plain Java libraries that OC
     // embeds into its release jar, so they must also be explicitly added to
     // the development run's additional runtime classpath.
     additionalRuntimeClasspath "com.typesafe:config:1.4.5"
-    additionalRuntimeClasspath ":OC-LuaJ:20220907.1"
-    additionalRuntimeClasspath ":OC-JNLua-Natives:20220928.1"
+    additionalRuntimeClasspath luaJ
+    additionalRuntimeClasspath jnluaNatives
+    additionalRuntimeClasspath "org.scala-lang:scala-library:2.13.12"
 
     def jeiSlug = "jei-${minecraft_version}"
 
@@ -284,6 +387,10 @@ dependencies {
     compileOnly("mezz.jei:${jeiSlug}-neoforge-api:${jei_version}")
     devRuntimeOnly("mezz.jei:${jeiSlug}-neoforge:${jei_version}")
 
+    // EMI
+    compileOnly("dev.emi:emi-neoforge:${emi_version}:api")
+    devRuntimeOnly("dev.emi:emi-neoforge:${emi_version}")
+
     // CodeChicken
     compileOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
     runtimeOnly("curse.maven:cb-multipart-258426:${cbmultipart_file_id}")
@@ -298,6 +405,10 @@ dependencies {
     compileOnly("mrtjp:ProjectRed:${projred_version}:api")
     runtimeOnly("mrtjp:ProjectRed:${projred_version}:core")
     runtimeOnly("mrtjp:ProjectRed:${projred_version}:transmission")
+
+    // Immersive Engineering
+    compileOnly("maven.modrinth:immersiveengineering:${immersiveengineering_version}")
+    runtimeOnly("maven.modrinth:immersiveengineering:${immersiveengineering_version}")
 
     testImplementation("com.typesafe:config:1.4.5")
     testImplementation("org.scala-lang:scala-library:2.13.12")
@@ -340,7 +451,8 @@ var generateModMetadata = tasks.register('generateModMetadata', ProcessResources
             mod_license            : mod_license,
             mod_version            : project.version,
             mod_authors            : mod_authors,
-            mod_description        : mod_description
+            mod_description        : mod_description,
+            sable_version_range    : sable_version_range
     ]
 
     inputs.properties replaceProperties
@@ -372,6 +484,13 @@ tasks.named('jar', Jar).configure {
         configurations.embedded.collect { it.isDirectory() ? it : zipTree(it) }
     }) {
         exclude 'META-INF', 'META-INF/**'
+    }
+
+    // Java's module resolver rejects two modules exporting scala.* packages.
+    // Relocate the bundled runtime and all compiled references to it so an
+    // older ScalableCatsForce installation can continue serving other mods.
+    doLast {
+        li.cil.oc.build.RelocateScalaJar.relocate(archiveFile.get().asFile.toPath())
     }
 
 //    finalizedBy 'reobfJar'

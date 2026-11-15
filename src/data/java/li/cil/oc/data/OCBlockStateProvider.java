@@ -1,10 +1,12 @@
 package li.cil.oc.data;
 
 import li.cil.oc.OpenComputers;
+import li.cil.oc.common.block.property.PropertyCableConnection;
 import li.cil.oc.common.block.property.PropertyRotatable;
 import li.cil.oc.common.block.property.PropertyRunning;
 import li.cil.oc.common.init.OCBlocks;
 import li.cil.oc.common.openprinter.OpenPrinter;
+import li.cil.oc.common.openprinter.block.DeviceBlock;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.PackOutput;
@@ -27,10 +29,10 @@ public class OCBlockStateProvider extends BlockStateProvider {
     @Override
     protected void registerStatesAndModels() {
         // Block Entity Renderers
-        simpleBlock(OCBlocks.Cable().get(), existingModel(Blocks.AIR));
         simpleBlock(OCBlocks.NetSplitter().get(), existingModel(Blocks.AIR));
         simpleBlock(OCBlocks.Print().get(), existingModel(Blocks.AIR));
-        simpleBlock(OCBlocks.Robot().get(), existingModel(Blocks.AIR));
+        simpleBlock(OCBlocks.Robot().get(), models().getBuilder("robot_particle")
+            .texture("particle", ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "model/robot")));
         simpleBlock(OCBlocks.RobotAfterimage().get(), existingModel(Blocks.AIR));
 
         simpleBlockWithItem(OCBlocks.Adapter().get(), models().cubeTop(modelName(OCBlocks.Adapter().get()),
@@ -64,11 +66,18 @@ public class OCBlockStateProvider extends BlockStateProvider {
         horizontalBlockGenericTop(OCBlocks.DiskDrive().get());
         itemModels().simpleBlockItem(OCBlocks.DiskDrive().get());
 
-        simpleBlockWithItem(OCBlocks.Geolyzer().get(), cubeGenericBottomTop(OCBlocks.Geolyzer().get()));
+        geolyzerBlock();
 
         simpleBlockWithItem(OCBlocks.HologramTier1().get(), existingModel(OCBlocks.HologramTier1().get()));
         simpleBlockWithItem(OCBlocks.HologramTier2().get(), existingModel(OCBlocks.HologramTier2().get()));
         simpleBlockWithItem(OCBlocks.HologramTier3().get(), existingModel(OCBlocks.HologramTier3().get()));
+
+        var projectorModel = existingModel(OCBlocks.Projector().get());
+        getVariantBuilder(OCBlocks.Projector().get()).forAllStates(state -> ConfiguredModel.builder()
+            .modelFile(projectorModel)
+            .rotationY(getYRotation(state.getValue(PropertyRotatable.Facing())))
+            .build());
+        simpleBlockItem(OCBlocks.Projector().get(), projectorModel);
 
         holoScreenBlock(OCBlocks.HoloScreenTier1().get());
         holoScreenBlock(OCBlocks.HoloScreenTier2().get());
@@ -146,8 +155,10 @@ public class OCBlockStateProvider extends BlockStateProvider {
         horizontalBlock(OpenPrinter.BRIEFCASE.get(), existingModel(OpenPrinter.BRIEFCASE.get()));
         itemModels().simpleBlockItem(OpenPrinter.BRIEFCASE.get());
 
-        horizontalBlock(OpenPrinter.PRINTER.get(), existingModel(OpenPrinter.PRINTER.get()));
+        printerBlock();
         itemModels().simpleBlockItem(OpenPrinter.PRINTER.get());
+
+        cableBlock();
     }
 
     private void caseBlock(Block block) {
@@ -155,6 +166,27 @@ public class OCBlockStateProvider extends BlockStateProvider {
         var runningModel = models().getExistingFile(ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "case_running"));
         horizontalBlock(block, s -> s.getValue(PropertyRunning.Running()) ? runningModel : model);
         simpleBlockItem(block, model);
+    }
+
+    private void geolyzerBlock() {
+        var geolyzer = OCBlocks.Geolyzer().get();
+
+        var geolyzerModel = cubeGenericBottomTop(geolyzer);
+        simpleBlockItem(geolyzer, geolyzerModel);
+
+        // Create a new model which just renders the geolyzer_top_on overlay texture, and set up our block state to use that.
+        var geolyzerModelTop = models().withExistingParent(modelName(geolyzer) + "_top_on", "block")
+            .renderType("cutout")
+            .texture("particle", textureName(geolyzer, "top"))
+            .texture("top", ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "block/overlay/geolyzer_top_on"));
+        geolyzerModelTop.element()
+            .from(0, 0, 0).to(16, 16, 16)
+            .face(Direction.UP).cullface(Direction.UP).texture("#top")
+            .emissivity(15, 15);
+
+        getMultipartBuilder(geolyzer)
+            .part().modelFile(geolyzerModel).addModel().end()
+            .part().modelFile(geolyzerModelTop).addModel();
     }
 
     private void screenBlock(Block block) {
@@ -223,6 +255,45 @@ public class OCBlockStateProvider extends BlockStateProvider {
         simpleBlockItem(block, model);
     }
 
+    private void cableBlock() {
+        var core = models().getExistingFile(ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "block/cable_core"));
+        var cableArm = models().getExistingFile(ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "block/cable_arm_cable"));
+        var deviceArm = models().getExistingFile(ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "block/cable_arm_device"));
+        var disconnected = models().getExistingFile(ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "block/cable_disconnected"));
+
+        var builder = getMultipartBuilder(OCBlocks.Cable().get());
+
+        // The core model is always present
+        builder.part().modelFile(core).addModel();
+
+        // Add the arms by default
+        for (var direction : Direction.values()) {
+            var property = PropertyCableConnection.BY_DIRECTION.get(direction);
+            var rotationX = -getXRotation(direction);
+            var rotationY = getYRotation(direction);
+            builder.part()
+                .modelFile(cableArm).rotationX(rotationX).rotationY(rotationY).addModel()
+                .condition(property, PropertyCableConnection.Shape.CABLE);
+
+            builder.part()
+                .modelFile(deviceArm).rotationX(rotationX).rotationY(rotationY).addModel()
+                .condition(property, PropertyCableConnection.Shape.DEVICE);
+
+            // Show the "disconnected" model if either *just* the opposite arm is connected, or none are.
+            var disconnectedBuilder = builder.part().modelFile(disconnected).rotationX(rotationX).rotationY(rotationY).addModel().useOr();
+            var noArms = disconnectedBuilder.nestedGroup();
+            var oneArm = disconnectedBuilder.nestedGroup();
+            for (var otherDir : Direction.values()) {
+                var otherProp = PropertyCableConnection.BY_DIRECTION.get(otherDir);
+                noArms.condition(otherProp, PropertyCableConnection.Shape.NONE);
+                if (otherDir == direction.getOpposite()) {
+                    oneArm.condition(otherProp, PropertyCableConnection.Shape.CABLE, PropertyCableConnection.Shape.DEVICE);
+                } else {
+                    oneArm.condition(otherProp, PropertyCableConnection.Shape.NONE);
+                }
+            }
+        }
+    }
 
     private String modelName(Block block) {
         return "block/" + BuiltInRegistries.BLOCK.getKey(block).getPath();
@@ -253,6 +324,16 @@ public class OCBlockStateProvider extends BlockStateProvider {
     private void horizontalBlockGenericTop(Block block) {
         horizontalBlock(block, models().orientable(
             modelName(block), textureName(block, "side"), textureName(block, "front"), GENERIC_TOP)
+        );
+    }
+
+    private void printerBlock() {
+        var block = OpenPrinter.PRINTER.get();
+        var model = existingModel(block);
+        getVariantBuilder(block).forAllStates(state -> ConfiguredModel.builder()
+            .modelFile(model)
+            .rotationY(getYRotation(state.getValue(DeviceBlock.FACING), 0))
+            .build()
         );
     }
 

@@ -13,8 +13,7 @@ import li.cil.oc.util.ItemUtils
 import net.minecraft.world.Container
 import net.minecraft.world.item.ItemStack
 
-import scala.collection.JavaConverters.asJavaIterable
-import scala.collection.convert.ImplicitConversionsToJava._
+import scala.jdk.CollectionConverters.IterableHasAsJava
 
 object DroneTemplate extends Template {
   override protected val suggestedComponents = Array(
@@ -68,7 +67,7 @@ object DroneTemplate extends Template {
         Tier.Two,
         Tier.One
       ),
-      asJavaIterable(Iterable(
+      Iterable(
         (Slot.Card, Tier.Two),
         (Slot.Card, Tier.One),
         null,
@@ -76,7 +75,7 @@ object DroneTemplate extends Template {
         (Slot.Memory, Tier.One),
         null,
         (Slot.EEPROM, Tier.Any)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Tier 2
     api.IMC.registerAssemblerTemplate(
@@ -91,7 +90,7 @@ object DroneTemplate extends Template {
         Tier.Two,
         Tier.One
       ),
-      asJavaIterable(Iterable(
+      Iterable(
         (Slot.Card, Tier.Two),
         (Slot.Card, Tier.Two),
         null,
@@ -99,7 +98,7 @@ object DroneTemplate extends Template {
         (Slot.Memory, Tier.One),
         (Slot.Memory, Tier.One),
         (Slot.EEPROM, Tier.Any)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Tier 2
     api.IMC.registerAssemblerTemplate(
@@ -115,7 +114,7 @@ object DroneTemplate extends Template {
         Tier.Two,
         Tier.One
       ),
-      asJavaIterable(Iterable(
+      Iterable(
         (Slot.Card, Tier.Three),
         (Slot.Card, Tier.Two),
         null,
@@ -123,7 +122,7 @@ object DroneTemplate extends Template {
         (Slot.Memory, Tier.Two),
         (Slot.Memory, Tier.One),
         (Slot.EEPROM, Tier.Any)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Creative
     api.IMC.registerAssemblerTemplate(
@@ -134,25 +133,25 @@ object DroneTemplate extends Template {
       hostClass,
       null,
       Array(
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three,
-        Tier.Three
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four,
+        Tier.Four
       ),
-      asJavaIterable(Iterable(
-        (Slot.Card, Tier.Three),
-        (Slot.Card, Tier.Three),
-        (Slot.Card, Tier.Three),
-        (Slot.CPU, Tier.Three),
-        (Slot.Memory, Tier.Three),
-        (Slot.Memory, Tier.Three),
+      Iterable(
+        (Slot.Card, Tier.Four),
+        (Slot.Card, Tier.Four),
+        (Slot.Card, Tier.Four),
+        (Slot.CPU, Tier.Four),
+        (Slot.Memory, Tier.Four),
+        (Slot.Memory, Tier.Four),
         (Slot.EEPROM, Tier.Any)
-      ).map(toPair)))
+      ).map(toPair).asJava)
 
     // Disassembler
     api.IMC.registerDisassemblerTemplate(
@@ -162,9 +161,13 @@ object DroneTemplate extends Template {
   }
 
   override protected def maxComplexity(inventory: Container) =
-    if (caseTier(inventory) == Tier.Two) 8
-    else if (caseTier(inventory) == Tier.Five) 9001 // Creative
-    else 5
+    caseTier(inventory) match {
+      case Tier.One => 5
+      case Tier.Two => 8
+      case Tier.Three => 10
+      case Tier.Five => 9001 // Creative
+      case _ => throw new IllegalStateException("Given drone tier does not have defined complexity")
+    }
 
   override protected def caseTier(inventory: Container) = ItemUtils.caseTier(inventory.getItem(0))
 }

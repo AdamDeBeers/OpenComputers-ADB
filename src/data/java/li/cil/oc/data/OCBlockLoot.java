@@ -58,6 +58,7 @@ class OCBlockLoot extends BlockLootSubProvider {
         dropSelf(OCBlocks.HologramTier1().get());
         dropSelf(OCBlocks.HologramTier2().get());
         dropSelf(OCBlocks.HologramTier3().get());
+        dropSelf(OCBlocks.Projector().get());
         dropSelf(OCBlocks.HoloScreenTier1().get());
         dropSelf(OCBlocks.HoloScreenTier2().get());
         dropSelf(OCBlocks.HoloScreenTier3().get());
@@ -104,6 +105,12 @@ class OCBlockLoot extends BlockLootSubProvider {
         // v.1.7.2
         dropSelf(OCBlocks.CarpetedCapacitor().get());
 
+        // Tape drives retain their inserted tape when broken.
+        dropVolatileContents(OCBlocks.TapeDrive().get());
+
+        dropSelf(OCBlocks.AudioCable().get());
+        dropSelf(OCBlocks.Speaker().get());
+
         // Open Printers
         dropSelf(OpenPrinter.BRIEFCASE.get());
         dropSelf(OpenPrinter.PRINTER.get());
@@ -149,7 +156,7 @@ class OCBlockLoot extends BlockLootSubProvider {
         add(block, LootTable.lootTable()
             .withPool(applyExplosionCondition(block, LootPool.lootPool()
                 .setRolls(ConstantValue.exactly(1.0F))
-                .add(LootItem.lootTableItem(block).apply(new CopyColor.Builder()))
+                .add(LootItem.lootTableItem(block).apply(CopyColor.copyColor()))
             ))
         );
     }

@@ -2,34 +2,35 @@ package li.cil.oc.common.item
 
 import com.google.common.cache.{CacheBuilder, RemovalListener, RemovalNotification}
 import com.google.common.collect.ImmutableMap
+import li.cil.oc.{api, client, server, Constants, Localization, OpenComputers, Settings}
+import li.cil.oc.api.{internal, Driver, Machine}
 import li.cil.oc.api.driver.item.Container
 import li.cil.oc.api.machine.MachineHost
 import li.cil.oc.api.network.{Connector, Message, Node}
-import li.cil.oc.api.{Driver, Machine, internal}
-import li.cil.oc.client.{KeyBindings, gui}
+import li.cil.oc.client.gui
+import li.cil.oc.common.{menu, Slot, Tier}
 import li.cil.oc.common.container.ComponentInventory
 import li.cil.oc.common.item.data.TabletData
 import li.cil.oc.common.menu.MenuTypes
-import li.cil.oc.common.{Slot, Tier, menu}
 import li.cil.oc.integration.opencomputers.DriverScreen
 import li.cil.oc.server.component.{Tablet => TabletComponent}
 import li.cil.oc.util._
-import li.cil.oc.{Constants, Localization, OpenComputers, Settings, api, client, server}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.model.ModelResourceLocation
 import net.minecraft.client.server.IntegratedServer
+import net.minecraft.core.{Direction, HolderLookup}
 import net.minecraft.core.component.{DataComponentHolder, DataComponents}
-import net.minecraft.core.{BlockPos, Direction, HolderLookup}
 import net.minecraft.nbt.{CompoundTag, Tag}
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world._
-import net.minecraft.world.entity.player.{Inventory, Player}
 import net.minecraft.world.entity.{Entity, LivingEntity}
+import net.minecraft.world.entity.player.{Inventory, Player}
+import net.minecraft.world.item.{Item, ItemStack, TooltipFlag}
 import net.minecraft.world.item.Item.Properties
 import net.minecraft.world.item.component.CustomData
-import net.minecraft.world.item.{Item, ItemStack}
+import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.level.Level
 import net.neoforged.api.distmarker.{Dist, OnlyIn}
 import net.neoforged.bus.api.SubscribeEvent
@@ -46,6 +47,7 @@ import java.util.UUID
 import java.util.concurrent.{Callable, TimeUnit}
 import scala.collection.JavaConverters.asJavaIterable
 import scala.collection.convert.ImplicitConversionsToScala._
+import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 
 class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with traits.Chargeable with IItemExtension {
@@ -53,15 +55,13 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
 
   // ----------------------------------------------------------------------- //
 
-  override protected def tooltipExtended(stack: ItemStack, tooltip: util.List[Component]): Unit = {
-    if (KeyBindings.showExtendedTooltips) {
+  override protected def tooltipExtended(stack: ItemStack, tooltip: util.List[Component], flag: TooltipFlag): Unit = {
+    if (Tooltip.showExtendedTooltip(flag)) {
       val info = new TabletData(stack)
       // Ignore/hide the screen.
       val components = info.items.drop(1)
       if (components.length > 1) {
-        for (curr <- Tooltip.get("server.Components")) {
-          tooltip.add(Component.literal(curr).setStyle(Tooltip.DefaultStyle))
-        }
+        Tooltip.add(tooltip, flag, "server.Components")
         components.collect {
           case component if !component.isEmpty => tooltip.add(Component.literal("- " + component.getHoverName.getString).setStyle(Tooltip.DefaultStyle))
         }
@@ -124,23 +124,20 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
       case _ =>
     }
 
-  override def onItemUseFirst(stack: ItemStack, player: Player, level: Level, pos: BlockPos, side: Direction, hitX: Float, hitY: Float, hitZ: Float, hand: InteractionHand): InteractionResult = {
-    Tablet.currentlyAnalyzing = Some((BlockPosition(pos, level), side, hitX, hitY, hitZ))
-    super.onItemUseFirst(stack, player, level, pos, side, hitX, hitY, hitZ, hand)
-  }
-
-  override def onItemUse(stack: ItemStack, player: Player, position: BlockPosition, side: Direction, hitX: Float, hitY: Float, hitZ: Float): Boolean = {
-    player.startUsingItem(if (player.getItemInHand(InteractionHand.MAIN_HAND) == stack) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND)
-    true
+  override def onItemUseFirst(stack: ItemStack, ctx: UseOnContext): InteractionResult = {
+    Tablet.currentlyAnalyzing = Some((
+      BlockPosition(ctx.getClickedPos, ctx.getLevel), ctx.getClickedFace,
+      (ctx.getClickLocation.x - ctx.getClickedPos.getX).toFloat,
+      (ctx.getClickLocation.y - ctx.getClickedPos.getY).toFloat,
+      (ctx.getClickLocation.z - ctx.getClickedPos.getZ).toFloat
+    ))
+    super.onItemUseFirst(stack, ctx)
   }
 
   @Deprecated
-  override def use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] =
-    use(player.getItemInHand(hand), level, player)
-
-  override def use(stack: ItemStack, level: Level, player: Player): InteractionResultHolder[ItemStack] = {
-    player.startUsingItem(if (player.getItemInHand(InteractionHand.MAIN_HAND) == stack) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND)
-    new InteractionResultHolder(InteractionResult.sidedSuccess(level.isClientSide), stack)
+  override def use(level: Level, player: Player, hand: InteractionHand): InteractionResultHolder[ItemStack] = {
+    player.startUsingItem(hand)
+    InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide)
   }
 
   override def getUseDuration(stack: ItemStack, entity: LivingEntity): Int = 72000
@@ -180,8 +177,10 @@ class Tablet(props: Properties) extends Item(props) with traits.SimpleItem with 
           }
           else {
             if (!level.isClientSide) {
-              val computer = Tablet.get(stack, player).machine
+              val tablet = Tablet.get(stack, player)
+              val computer = tablet.machine
               computer.start()
+              tablet.syncRunningState()
               computer.lastError match {
                 case message if message != null => player.sendSystemMessage(Localization.Analyzer.LastError(message))
                 case _ =>
@@ -390,6 +389,27 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
 
   // ----------------------------------------------------------------------- //
 
+  /** Synchronize the running flag after a direct power-state change. */
+  def syncRunningState(): Unit = {
+    val running = machine.isRunning
+    val changed = lastRunning != running || data.isRunning != running
+    data.isRunning = running
+    if (changed) {
+      lastRunning = running
+      setChanged()
+      player match {
+        case mp: ServerPlayer => server.PacketSender.sendMachineItemState(mp, stack, running)
+        case _ =>
+      }
+      if (running) {
+        componentSlots collect {
+          case Some(buffer: api.internal.TextBuffer) =>
+            buffer.setPowerState(true)
+        }
+      }
+    }
+  }
+
   def update(level: Level, player: Player, slot: Int, selected: Boolean): Unit = {
     this.player = player
     if (!isInitialized) {
@@ -403,6 +423,13 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
         case Some(buffer: api.internal.TextBuffer) =>
           buffer.setMaximumColorDepth(colorDepth)
           buffer.setMaximumResolution(80, 25)
+          buffer match {
+            case concrete: li.cil.oc.common.component.TextBuffer => {
+              // For some reason the TextBuffer needs re-initilization here, might be an X/Y Problem though.
+              concrete.markInitialized()
+            }
+            case _ =>
+          }
       }
 
       client.PacketSender.sendMachineItemStateRequest(stack, level.registryAccess())
@@ -413,26 +440,9 @@ class TabletWrapper(var stack: ItemStack, var player: Player) extends ComponentI
       }
       machine.update()
       updateComponents()
-      data.isRunning = machine.isRunning
       data.energy = tablet.node.globalBuffer()
       data.maxEnergy = tablet.node.globalBufferSize()
-
-      if (lastRunning != machine.isRunning) {
-        lastRunning = machine.isRunning
-        setChanged()
-
-        player match {
-          case mp: ServerPlayer => server.PacketSender.sendMachineItemState(mp, stack, machine.isRunning)
-          case _ =>
-        }
-
-        if (machine.isRunning) {
-          componentSlots collect {
-            case Some(buffer: api.internal.TextBuffer) =>
-              buffer.setPowerState(true)
-          }
-        }
-      }
+      syncRunningState()
     }
   }
 
@@ -452,6 +462,8 @@ object Tablet {
   // This is super-hacky, but since it's only used on the client we get away
   // with storing context information for analyzing a block in the singleton.
   var currentlyAnalyzing: Option[(BlockPosition, Direction, Float, Float, Float)] = None
+
+  private val lastCursorTicks = mutable.Map.empty[UUID, (String, Long)]
 
   def getId(stack: ItemStack): Option[String] = {
     val tag = ItemUtils.getTag(stack)
@@ -497,6 +509,10 @@ object Tablet {
   @SubscribeEvent
   def onClientTick(e: ClientTickEvent.Pre): Unit = {
     Client.cleanUp()
+    val player = Minecraft.getInstance.player
+    if (player != null) {
+      getId(player.containerMenu.getCarried).foreach(client.PacketSender.sendTabletCursorTick)
+    }
     ServerLifecycleHooks.getCurrentServer match {
       case integrated: IntegratedServer if Minecraft.getInstance.isPaused =>
         // While the game is paused, manually keep all tablets alive, to avoid
@@ -510,6 +526,21 @@ object Tablet {
   @SubscribeEvent
   def onServerTick(e: ServerTickEvent.Pre): Unit = {
     Server.cleanUp()
+  }
+
+
+  /** Advance a running tablet held by a player's client-side cursor. */
+  def tickCursorHeld(player: ServerPlayer, id: String): Unit = {
+    val gameTime = player.level.getGameTime
+    val key = player.getUUID
+    if (!lastCursorTicks.get(key).contains((id, gameTime))) {
+      // Never construct a machine from client data. A cursor tick may only
+      // reach a tablet which this player already owns in the server cache.
+      Server.get(id).filter(_.player == player).foreach { tablet =>
+        lastCursorTicks(key) = (id, gameTime)
+        tablet.update(player.level, player, -1, selected = false)
+      }
+    }
   }
 
   abstract class Cache extends Callable[TabletWrapper] with RemovalListener[String, TabletWrapper] {
@@ -577,18 +608,31 @@ object Tablet {
       val tablet = e.getValue
       if (tablet.node != null) {
         // Server.
-        if (tablet.autoSave) tablet.writeToNBT(tablet.player.registryAccess())
         tablet.machine.stop()
+
+        // Ordinary eviction powers the tablet off. World/dimension changes
+        // save the running state before teardown and disable autoSave.
+        if (tablet.autoSave) {
+          tablet.data.isRunning = tablet.machine.isRunning
+          tablet.writeToNBT(tablet.player.registryAccess())
+        }
+
         for (node <- tablet.machine.node.network.nodes) {
           node.remove()
         }
-        tablet.setChanged()
+        if (tablet.autoSave) tablet.setChanged()
       }
     }
 
     def clear(level: Level): Unit = {
       cache.synchronized {
         val tabletsInWorld = cache.asMap.filter(_._2.getEnvironmentLevel == level)
+        if (!level.isClientSide) {
+          for (tablet <- tabletsInWorld.values) {
+            tablet.writeToNBT(tablet.player.registryAccess())
+            tablet.autoSave = false
+          }
+        }
         cache.invalidateAll(asJavaIterable(tabletsInWorld.keys))
         cache.cleanUp()
       }
@@ -608,13 +652,7 @@ object Tablet {
     override protected def timeout = 5
 
     def getWeak(stack: ItemStack): Option[TabletWrapper] = {
-      val key = getId(stack)
-      if (key.nonEmpty) {
-        val map = cache.asMap
-        if (map.containsKey(key)) map.entrySet.find(entry => entry.getKey == key.get).get.getValue
-      }
-
-      None
+      getId(stack).flatMap(key => Option(cache.asMap.get(key)))
     }
 
     def get(stack: ItemStack): Option[TabletWrapper] = {
@@ -627,6 +665,19 @@ object Tablet {
   }
 
   object Server extends Cache {
+    def get(id: String): Option[TabletWrapper] = cache.synchronized(Option(cache.getIfPresent(id)))
+
+    def invalidate(stack: ItemStack): Unit = {
+      val id = getOrCreateId(stack)
+      cache.synchronized {
+        // Inventory transfers commonly give the charger a copy of the
+        // player's stack. Make cache teardown persist into that actual stack.
+        Option(cache.getIfPresent(id)).foreach(_.stack = stack)
+        cache.invalidate(id)
+        cache.cleanUp()
+      }
+    }
+
     def save(player: Player): Unit = {
       cache.synchronized {
         for (tablet <- cache.asMap.values if tablet.player == player) {

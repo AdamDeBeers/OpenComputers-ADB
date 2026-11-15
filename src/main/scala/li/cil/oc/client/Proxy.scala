@@ -47,6 +47,7 @@ private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
     NeoForge.EVENT_BUS.register(WirelessNetworkDebugRenderer)
     NeoForge.EVENT_BUS.register(Audio)
     NeoForge.EVENT_BUS.register(HologramRenderer)
+    NeoForge.EVENT_BUS.register(ProjectorRenderer)
     NeoForge.EVENT_BUS.register(ScreenRenderer)
     NeoForge.EVENT_BUS.register(TabletRenderer)
   }
@@ -74,8 +75,8 @@ private[oc] class Proxy(modBus: IEventBus) extends CommonProxy(modBus) {
     BlockEntityRenderers.register(BlockEntityTypes.CHARGER.get(), ChargerRenderer)
     BlockEntityRenderers.register(BlockEntityTypes.DISASSEMBLER.get(), DisassemblerRenderer)
     BlockEntityRenderers.register(BlockEntityTypes.DISK_DRIVE.get(), DiskDriveRenderer)
-    BlockEntityRenderers.register(BlockEntityTypes.GEOLYZER.get(), GeolyzerRenderer)
     BlockEntityRenderers.register(BlockEntityTypes.HOLOGRAM.get(), HologramRenderer)
+    BlockEntityRenderers.register(BlockEntityTypes.PROJECTOR.get(), ProjectorRenderer)
     BlockEntityRenderers.register(BlockEntityTypes.MICROCONTROLLER.get(), ctx => new MicrocontrollerRenderer(ctx))
     BlockEntityRenderers.register(BlockEntityTypes.NET_SPLITTER.get(), ctx => new NetSplitterRenderer(ctx))
     BlockEntityRenderers.register(BlockEntityTypes.POWER_DISTRIBUTOR.get(), PowerDistributorRenderer)

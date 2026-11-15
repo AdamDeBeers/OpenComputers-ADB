@@ -370,6 +370,8 @@ class Settings(val config: Config) {
   val disassembleAllTheThings = config.getBoolean("misc.disassembleAllTheThings")
   val disassemblerBreakChance = config.getDouble("misc.disassemblerBreakChance") max 0 min 1
   val disassemblerInputBlacklist = config.getStringList("misc.disassemblerInputBlacklist")
+  val hideTier4 = config.getBoolean("misc.hideTier4")
+  val hideOpenScreens = config.getBoolean("misc.hideOpenScreens")
   val hideOwnPet = config.getBoolean("misc.hideOwnSpecial")
   val allowItemStackInspection = config.getBoolean("misc.allowItemStackInspection")
   val databaseEntriesPerTier = Array(9, 25, 81)
@@ -508,6 +510,13 @@ class Settings(val config: Config) {
 
   val bitbltCost: Double = if (config.hasPath("gpu.bitbltCost")) config.getDouble("gpu.bitbltCost") else 0.5
 
+  val defaultResolution: (Int, Int) = config.getIntList("gpu.defaultResolution").asScala.map(_.intValue()).toArray match {
+    case Array(width, height) if width >= 0 && height >= 0 => (width, height)
+    case _ =>
+      OpenComputers.log.warn("Bad default resolution (expected two non-negative integers), ignoring.")
+      (0, 0)
+  }
+
   // >= 1.8.2
   val diskActivitySoundDelay: Int = config.getInt("misc.diskActivitySoundDelay") max -1
   val maxNetworkClientPacketDistance: Double = config.getDouble("misc.maxNetworkClientPacketDistance") max 0
@@ -531,6 +540,7 @@ class Settings(val config: Config) {
 
   // >= 1.9.0
   val audioCardChunkSize: Int = config.getInt("audio.chunkSize") max 0 // 4096
+  val audioCardEnablePcm: Boolean = config.getBoolean("audio.enablePcm")
   val audioCardBufferLimit: Int = config.getInt("audio.bufferLimit") max 0 // 8 MiB (8 * 1024 * 1024)
   val audioCardSampleRate: Int = config.getInt("audio.sampleRate") min 48000 max 0 // 48000
   val audioCardFormat: Int = config.getInt("audio.format") // 1

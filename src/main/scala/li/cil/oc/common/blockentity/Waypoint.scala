@@ -8,6 +8,7 @@ import li.cil.oc.api.machine.Context
 import li.cil.oc.api.network.Visibility
 import li.cil.oc.common.EventHandler
 import li.cil.oc.common.datacomponents.OCComponents
+import li.cil.oc.server.PacketSender
 import li.cil.oc.server.network.Waypoints
 import li.cil.oc.util.ExtendedDataComponentHolder._
 import net.minecraft.core.component.DataComponentHolder
@@ -40,6 +41,8 @@ class Waypoint(pos: BlockPos, state: BlockState)
   @Callback(doc = """function(value:string) -- Set the label for this waypoint.""")
   def setLabel(context: Context, args: Arguments): Array[Object] = {
     label = args.checkString(0).take(32)
+    setChanged()
+    PacketSender.sendWaypointLabel(this)
     context.pause(0.5)
     null
   }

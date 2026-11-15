@@ -12,7 +12,7 @@ import net.neoforged.neoforge.common.util.FakePlayer
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent
 import net.neoforged.neoforge.event.entity.player.PlayerEvent._
-import net.neoforged.neoforge.event.level.{BlockEvent, ChunkEvent, LevelEvent}
+import net.neoforged.neoforge.event.level.{BlockEvent, ChunkEvent, ChunkWatchEvent, LevelEvent}
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import net.neoforged.neoforge.server.ServerLifecycleHooks
 
@@ -127,6 +127,7 @@ object EventHandler {
 
     serverTicks += 1
     li.cil.oc.server.component.MiningBudget.onServerTick()
+    integration.SableTickBridge.tick(e.getServer)
     while (pendingServerTimed.nonEmpty && pendingServerTimed.head._1 < serverTicks) {
       val (_, callback) = pendingServerTimed.dequeue()
       try callback() catch {
@@ -199,14 +200,22 @@ object EventHandler {
   @SubscribeEvent
   @OnlyIn(Dist.CLIENT)
   def clientLoggedIn(e: ClientPlayerNetworkEvent.LoggingIn): Unit = {
+    li.cil.oc.client.PacketHandler.clearPendingProjectorFrames()
+    li.cil.oc.client.PacketHandler.stopAllAudio()
     PetRenderer.isInitialized = false
     PetRenderer.hidden.clear()
-    Loot.disksForClient.clear()
-    Loot.disksForClient ++= Loot.globalDisks.map(_._1.copy())
+    Loot.resetDisksForClient()
     Loot.disksForCyclingClient.clear()
     Loot.disksForCyclingClient ++= Loot.disksForCyclingServer.map(_.copy())
     Loot.eepromsForClient.clear()
 
+    client.Sound.stopAll()
+  }
+
+  @SubscribeEvent
+  @OnlyIn(Dist.CLIENT)
+  def clientLoggedOut(e: ClientPlayerNetworkEvent.LoggingOut): Unit = {
+    li.cil.oc.client.PacketHandler.stopAllAudio()
     client.Sound.stopAll()
   }
 
@@ -375,29 +384,31 @@ object EventHandler {
   def onWorldUnload(e: LevelEvent.Unload): Unit = this.synchronized {
     val level = e.getLevel
 
-    if (!level.isClientSide) {
-      val serverLevel = level.asInstanceOf[ServerLevel]
+    if (level.isClientSide) {
+      li.cil.oc.client.PacketHandler.stopAllAudio()
+      TerminalServer.loaded.clear()
+      return
+    }
 
-      val chunkMap = serverLevel.getChunkSource.chunkMap
-      chunkMap.getChunks.asScala.foreach { holder =>
-        val chunk = holder.getTickingChunk
-        if (chunk != null) {
-          chunk.getBlockEntities.values().asScala.foreach {
-            case te: blockentity.traits.BaseBlockEntity => te.dispose()
-            case _ =>
-          }
+    val serverLevel = level.asInstanceOf[ServerLevel]
+
+    val chunkMap = serverLevel.getChunkSource.chunkMap
+    chunkMap.getChunks.asScala.foreach { holder =>
+      val chunk = holder.getTickingChunk
+      if (chunk != null) {
+        chunk.getBlockEntities.values().asScala.foreach {
+          case te: blockentity.traits.BaseBlockEntity => te.dispose()
+          case _ =>
         }
       }
-
-      serverLevel.getAllEntities.asScala.foreach {
-        case host: MachineHost => host.machine.stop()
-        case _ =>
-      }
-
-      Callbacks.clear()
-    } else {
-      TerminalServer.loaded.clear()
     }
+
+    serverLevel.getAllEntities.asScala.foreach {
+      case host: MachineHost => host.machine.stop()
+      case _ =>
+    }
+
+    Callbacks.clear()
   }
 
   @SubscribeEvent
@@ -438,6 +449,15 @@ object EventHandler {
 
         case _ =>
       }
+    }
+  }
+
+  @SubscribeEvent
+  def onChunkSent(e: ChunkWatchEvent.Sent): Unit = {
+    e.getChunk.getBlockEntities.values().asScala.foreach {
+      case projector: blockentity.Projector =>
+        ServerPacketSender.sendProjectorFrameToPlayer(projector, e.getPlayer)
+      case _ =>
     }
   }
 }
