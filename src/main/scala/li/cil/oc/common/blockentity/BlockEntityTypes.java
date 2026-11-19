@@ -15,6 +15,11 @@ public final class BlockEntityTypes {
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
             DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, OpenComputers.ID());
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AdbLight>> ADB_LIGHT =
+            BLOCK_ENTITY_TYPES.register("adb_light", () -> BlockEntityType.Builder
+                    .of(AdbLight::new, OCBlocks.AdbLight().get())
+                    .build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<Adapter>> ADAPTER =
             BLOCK_ENTITY_TYPES.register("adapter", () -> BlockEntityType.Builder
                     .of(Adapter::new, OCBlocks.Adapter().get())

@@ -35,6 +35,8 @@ public class OCBlockStateProvider extends BlockStateProvider {
             .texture("particle", ResourceLocation.fromNamespaceAndPath(OpenComputers.ID(), "model/robot")));
         simpleBlock(OCBlocks.RobotAfterimage().get(), existingModel(Blocks.AIR));
 
+        simpleBlockWithItem(OCBlocks.AdbLight().get(), existingModel(OCBlocks.AdbLight().get()));
+
         simpleBlockWithItem(OCBlocks.Adapter().get(), models().cubeTop(modelName(OCBlocks.Adapter().get()),
             textureName(OCBlocks.Adapter().get(), "side"),
             textureName(OCBlocks.Adapter().get(), "top")

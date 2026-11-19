@@ -102,6 +102,9 @@ class OCBlockLoot extends BlockLootSubProvider {
         // v1.5.16
         dropSelf(OCBlocks.Transposer().get());
 
+        // ADB
+        dropSelf(OCBlocks.AdbLight().get());
+
         // v.1.7.2
         dropSelf(OCBlocks.CarpetedCapacitor().get());
 

@@ -83,6 +83,9 @@ object OCBlocks {
   // v1.7.2
   val CarpetedCapacitor: DeferredBlock[CarpetedCapacitor] = BLOCKS.register(Constants.BlockName.CarpetedCapacitor, () => Items.registerBlock(new CarpetedCapacitor(defaultProps), Constants.BlockName.CarpetedCapacitor, defaultItemProps,"10_networking"))
 
+  // ADB: network-controlled lamp
+  val AdbLight: DeferredBlock[AdbLight] = BLOCKS.register(Constants.BlockName.AdbLight, () => Items.registerBlock(new AdbLight(defaultProps), Constants.BlockName.AdbLight, defaultItemProps,"25_components"))
+
   def init(bus: IEventBus): Unit = {
     BLOCKS.register(bus)
   }

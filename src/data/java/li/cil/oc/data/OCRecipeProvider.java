@@ -839,6 +839,18 @@ class OCRecipeProvider extends RecipeProvider {
             .unlockedBy(getHasName(OCItems.Card()), has(OCItems.Card()))
             .save(output);
 
+        // ADB: network-controlled lamp
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCBlocks.AdbLight())
+            .pattern("iGi")
+            .pattern("GMG")
+            .pattern("iCi")
+            .define('i', Tags.Items.INGOTS_IRON)
+            .define('G', Items.GLOWSTONE_DUST)
+            .define('M', OCItems.ChipTier1())
+            .define('C', OCBlocks.Cable())
+            .unlockedBy(getHasName(OCItems.ChipTier1()), has(OCItems.ChipTier1()))
+            .save(output);
+
         // ADB: ForgeCoin mining cards
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, OCItems.MiningCardTier1())
             .pattern("gCg")

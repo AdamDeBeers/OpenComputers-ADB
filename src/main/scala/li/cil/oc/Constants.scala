@@ -12,6 +12,7 @@ object Constants {
   }
 
   object BlockName {
+    final val AdbLight = "adb_light"
     final val Adapter = "adapter"
     final val Assembler = "assembler"
     final val Cable = "cable"

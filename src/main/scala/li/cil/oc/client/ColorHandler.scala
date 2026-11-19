@@ -35,6 +35,16 @@ object ColorHandler {
       OCBlocks.CaseTier4.get(),
       OCBlocks.CaseCreative.get())
 
+    // Tint follows the configured color, dimmed by the current light level (dark when off).
+    event.register((state, world, pos, tintIndex) => {
+      val rgb = if (world == null || pos == null) block.AdbLight.DefaultColor else world.getBlockEntity(pos) match {
+        case light: blockentity.AdbLight => light.getColor
+        case _ => block.AdbLight.DefaultColor
+      }
+      val level = if (state.hasProperty(block.AdbLight.Light)) state.getValue(block.AdbLight.Light).intValue else block.AdbLight.DefaultBrightness
+      FastColor.ARGB32.opaque(block.AdbLight.shade(rgb, level))
+    }, OCBlocks.AdbLight.get())
+
     event.register((state, world, pos, tintIndex) => Color.rgbValues(state.getValue(block.ChameliumBlock.Color)),
       OCBlocks.ChameliumBlock.get())
 
